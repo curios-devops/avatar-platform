@@ -1,0 +1,151 @@
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
+from typing import Optional
+import uuid
+from datetime import datetime
+
+from ..models import CreateAvatarRequest, ProcessPhotoRequest, GenerateAvatarRequest, Avatar, JobStatus
+from ..services.queue import queue_service
+from ..services.storage import storage_service
+from ..services.runpod_client import runpod_client
+from ..workers.pipeline_worker import run_avatar_pipeline
+from ..workers.generate_worker import run_generate_pipeline
+
+router = APIRouter(prefix="/avatar", tags=["avatar"])
+
+
+@router.post("/create", response_model=JobStatus)
+async def create_avatar(request: CreateAvatarRequest):
+    """
+    Create a new Gaussian avatar from video
+
+    Flow:
+    1. Download video
+    2. Extract frames (ffmpeg)
+    3. RunPod job: COLMAP + SplattingAvatar + gsplat
+    4. Export gaussian .ply + metadata
+    """
+    try:
+        # Submit reconstruction job
+        job_id = queue_service.submit_job("reconstruction", {
+            "video_url": request.video_url,
+            "mode": request.mode
+        })
+
+        # Submit to RunPod
+        runpod_job_id = runpod_client.submit_job("reconstruction", {
+            "video_url": request.video_url,
+            "mode": request.mode,
+            "job_id": job_id
+        })
+
+        # Store RunPod job ID reference
+        queue_service.update_job_status(
+            job_id,
+            "processing",
+            progress=0.1,
+            result={"runpod_job_id": runpod_job_id}
+        )
+
+        return JobStatus(
+            id=job_id,
+            status="processing",
+            progress=0.1
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/upload")
+async def upload_video(file: UploadFile = File(...)):
+    """Upload video file directly"""
+    try:
+        file_id = f"videos/{uuid.uuid4()}.mp4"
+        url = storage_service.upload_fileobj(file.file, file_id)
+
+        return {"video_url": url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/process", response_model=JobStatus)
+async def process_photo(
+    request: ProcessPhotoRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Start the photo → FLAME-rigged Gaussian head pipeline.
+
+    Accepts a photo_url from the /avatar/upload endpoint (or any accessible URL).
+    Returns job_id immediately; pipeline runs in the background.
+
+    Poll GET /avatar/job/{job_id}/status for progress.
+    When status == "done", result contains the full AvatarBundle including preview_url.
+    """
+    job_id = queue_service.submit_job("avatar_pipeline", {"photo_url": request.photo_url})
+    background_tasks.add_task(run_avatar_pipeline, job_id, request.photo_url)
+    return JobStatus(id=job_id, status="processing", progress=0.0)
+
+
+@router.get("/job/{job_id}/preview")
+async def get_avatar_preview(job_id: str):
+    """
+    Return the neutral-front preview URL for a completed avatar job.
+    Intended for the UI to display a head-asset preview without parsing the full bundle.
+    """
+    job = queue_service.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["status"] == "failed":
+        raise HTTPException(status_code=422, detail=job.get("error", "Pipeline failed"))
+    if job["status"] != "done":
+        raise HTTPException(
+            status_code=202,
+            detail=f"Job not ready yet (status: {job['status']}, "
+                   f"progress: {job.get('progress', 0):.0%})",
+        )
+    bundle = job.get("result", {})
+    preview_url = bundle.get("preview")
+    if not preview_url:
+        raise HTTPException(status_code=500, detail="Preview URL missing from bundle")
+    return {"preview_url": preview_url, "job_id": job_id}
+
+
+@router.post("/generate", response_model=JobStatus)
+async def generate_avatar_from_prompt(
+    request: GenerateAvatarRequest,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Generate an avatar from a text description.
+
+    Uses an image generation model (or mock in dev) to create a face image
+    from the description, then runs the full photo → FLAME pipeline on it.
+
+    Poll GET /avatar/job/{job_id}/status for progress.
+    """
+    job_id = queue_service.submit_job(
+        "generate_pipeline",
+        {"description": request.description, "style": request.style},
+    )
+    background_tasks.add_task(run_generate_pipeline, job_id, request.description, request.style)
+    return JobStatus(id=job_id, status="processing", progress=0.0)
+
+
+@router.get("/{avatar_id}", response_model=Avatar)
+async def get_avatar(avatar_id: str):
+    """Get avatar details"""
+    # TODO: Implement database lookup
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.get("/job/{job_id}/status", response_model=JobStatus)
+async def get_job_status(job_id: str):
+    """Poll job status"""
+    job = queue_service.get_job_status(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return JobStatus(**job)

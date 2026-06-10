@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Avatar",
+  "type": "object",
+  "required": ["id", "gaussians_url", "type", "created_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^avatar_[a-zA-Z0-9]+$"
+    },
+    "gaussians_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "rig": {
+      "type": "object"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["head", "full_body"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

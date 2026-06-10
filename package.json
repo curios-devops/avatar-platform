@@ -1,0 +1,14 @@
+{
+  "name": "avatar-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names BACKEND,FRONTEND --prefix-colors blue.bold,green.bold \"npm run backend\" \"npm run frontend\"",
+    "backend": "backend/.venv/bin/uvicorn app.main:app --reload --port 8000 --log-level info --app-dir backend",
+    "frontend": "cd frontend && npm run dev",
+    "install:all": "cd frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

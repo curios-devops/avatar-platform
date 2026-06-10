@@ -1,0 +1,38 @@
+runpod>=1.6.0
+numpy>=1.26.0
+Pillow>=10.0.0
+scipy>=1.11.0
+
+# PyTorch — base image already provides CUDA build; pin to match
+torch>=2.1.0
+torchvision>=0.16.0
+
+# ── Phase 0: DECA (FLAME fitting + vertex decoding) ──────────────────────────
+# Source install (no PyPI package). Requires FLAME weights at /weights/deca_model.tar
+git+https://github.com/YadiraF/DECA.git
+
+# DECA runtime deps
+face-alignment>=1.3.5
+kornia>=0.6.12
+
+# ── Phase 0 fallback: mediapipe face mesh ────────────────────────────────────
+mediapipe>=0.10.0
+
+# ── Phase 2: pytorch3d (needed by MICA, EMOCA, and DECA decoder) ─────────────
+# Pre-built wheel for CUDA 11.8 + torch 2.1 — fastest install.
+# Falls back to source build if wheel URL breaks (slower ~20 min).
+fvcore
+iopath
+
+# ── Phase 2: MICA (multi-view identity reconstruction) ───────────────────────
+# Requires /weights/mica/mica.tar + insightface antelopev2 models.
+insightface>=0.7.3
+onnxruntime-gpu>=1.16.0
+git+https://github.com/Zielon/MICA.git
+
+# ── Phase 2: EMOCA (detailed face reconstruction + albedo) ───────────────────
+# Requires /weights/emoca/emoca.tar + /weights/emoca/cfg.yaml.
+omegaconf>=2.3.0
+hydra-core>=1.3.2
+git+https://github.com/radekd91/emoca.git#subdirectory=gdl
+git+https://github.com/radekd91/emoca.git#subdirectory=gdl_apps
