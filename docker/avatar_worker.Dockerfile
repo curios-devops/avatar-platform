@@ -21,7 +21,7 @@
 #   Option B (bake into image — larger, easier cold start):
 #     Uncomment the COPY blocks near the bottom.
 
-FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
+FROM runpod/pytorch:2.2.1-py3.10-cuda12.1.1-devel-ubuntu22.04
 
 WORKDIR /app
 
@@ -43,13 +43,9 @@ RUN pip install --no-cache-dir \
     kornia>=0.6.12 \
     mediapipe>=0.10.0
 
-# ── pytorch3d (pre-built wheel for CUDA 11.8 + torch 2.1) ────────────────────
-# Falls back to source build if the wheel URL breaks (~20 min build time).
+# ── pytorch3d (build from source — compatible with CUDA 12.1 + torch 2.2) ────
 RUN pip install --no-cache-dir fvcore iopath && \
-    pip install --no-cache-dir \
-        "pytorch3d @ https://dl.fbaipublicfiles.com/detectron2/wheels/cu118/torch210/pytorch3d-0.7.4-cp310-cp310-linux_x86_64.whl" \
-    || pip install --no-cache-dir \
-        "git+https://github.com/facebookresearch/pytorch3d.git@stable"
+    pip install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git@stable"
 
 # ── DECA (Phase 0 FLAME fitter) ───────────────────────────────────────────────
 RUN git clone --depth 1 https://github.com/YadiraF/DECA.git /opt/DECA
@@ -64,7 +60,7 @@ RUN pip install --no-cache-dir \
 # ── MICA model (Phase 2) ──────────────────────────────────────────────────────
 RUN git clone --depth 1 https://github.com/Zielon/MICA.git /opt/MICA
 
-ENV PYTHONPATH="/opt/DECA:/opt/MICA"
+ENV PYTHONPATH="/opt/DECA:/opt/MICA:/opt/emoca:/opt/emoca/gdl"
 
 # ── EMOCA deps (Phase 2 detailed reconstruction + albedo) ────────────────────
 RUN pip install --no-cache-dir \
@@ -72,9 +68,11 @@ RUN pip install --no-cache-dir \
     hydra-core>=1.3.2 \
     scikit-image>=0.21.0
 
-# ── EMOCA model (Phase 2) — setup.py is at repo root, gdl/ is the package dir ─
+# ── EMOCA model (Phase 2) — clone only, install via PYTHONPATH ───────────────
+# Avoids pip install failures if repo root lacks setup.py/pyproject.toml.
 RUN git clone --depth 1 https://github.com/radekd91/emoca.git /opt/emoca && \
-    pip install --no-cache-dir -e /opt/emoca
+    pip install --no-cache-dir -e /opt/emoca 2>/dev/null || \
+    echo "EMOCA pip install skipped — using PYTHONPATH fallback"
 
 # ── Worker code ───────────────────────────────────────────────────────────────
 COPY worker/avatar_worker/ /app/
