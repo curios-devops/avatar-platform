@@ -36,7 +36,11 @@ RUN pip install --no-cache-dir \
     "onnxruntime-gpu>=1.16.0" \
     "yacs>=0.1.8" \
     "loguru>=0.7.0" \
-    "scikit-image>=0.21.0"
+    "scikit-image>=0.21.0" \
+    "trimesh>=3.16.0" \
+    "easydict>=1.10" \
+    "imageio>=2.22.0" \
+    "face-alignment>=1.3.5"
 # NOTE: chumpy is NOT installed — FLAME2020 pkl unpickling is handled by
 # chumpy_stub.py in the worker code (chumpy doesn't build on modern numpy).
 
