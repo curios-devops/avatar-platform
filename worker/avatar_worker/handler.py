@@ -706,4 +706,11 @@ def handler(job: dict) -> dict:
 
 
 if __name__ == "__main__":
+    # Populate the network volume from presigned URLs on first boot
+    try:
+        from bootstrap_weights import ensure_weights
+        ensure_weights()
+    except Exception as _exc:  # never block worker start on bootstrap issues
+        logger.warning("weights bootstrap skipped: %s", _exc)
+
     runpod.serverless.start({"handler": handler})
