@@ -359,18 +359,44 @@ def _load_mica():
     import torch
     from insightface.app import FaceAnalysis  # type: ignore[import]
 
-    # ArcFace — auto-downloads antelopev2 on first run if not cached
+    # Face detector for ArcFace crops — auto-downloads on first run.
+    # antelopev2 (MICA's choice) has a known packaging bug where the zip
+    # extracts nested and FaceAnalysis asserts 'detection' missing; buffalo_l
+    # provides equivalent SCRFD detection + 5-point kps for norm_crop.
     insightface_root = os.path.join(MICA_WEIGHTS, "insightface")
     os.makedirs(insightface_root, exist_ok=True)
-    _arc = FaceAnalysis(
-        name="antelopev2",
-        root=insightface_root,
-        providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-    )
-    _arc.prepare(
-        ctx_id=0 if torch.cuda.is_available() else -1,
-        det_size=(224, 224),
-    )
+
+    # Repair nested antelopev2 extraction if present (models/antelopev2/antelopev2)
+    nested = os.path.join(insightface_root, "models", "antelopev2", "antelopev2")
+    if os.path.isdir(nested):
+        import shutil
+        parent = os.path.dirname(nested)
+        for f in os.listdir(nested):
+            shutil.move(os.path.join(nested, f), os.path.join(parent, f))
+        os.rmdir(nested)
+        logger.info("Repaired nested antelopev2 extraction")
+
+    _arc = None
+    arc_error: Exception | None = None
+    for pack in ("antelopev2", "buffalo_l"):
+        try:
+            _arc = FaceAnalysis(
+                name=pack,
+                root=insightface_root,
+                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            )
+            _arc.prepare(
+                ctx_id=0 if torch.cuda.is_available() else -1,
+                det_size=(224, 224),
+            )
+            logger.info("insightface pack: %s", pack)
+            break
+        except Exception as exc:
+            logger.warning("insightface %s failed (%s) — trying next pack", pack, exc)
+            arc_error = exc
+            _arc = None
+    if _arc is None:
+        raise RuntimeError(f"No insightface detection pack available: {arc_error}")
 
     # MICA model — repo layout (PYTHONPATH=/opt/MICA):
     #   configs/config.py        → get_cfg_defaults()
