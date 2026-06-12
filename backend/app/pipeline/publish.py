@@ -32,6 +32,7 @@ def publish(
         eyes=urls["eyes.glb"],
         teeth=urls["teeth.glb"],
         body=urls["body.glb"],
+        texture=urls.get("texture.png", ""),
         expression_basis="ARKit_52",
         unmodeled=["mouth_interior_detail"],
         preview=urls["neutral_front.png"],

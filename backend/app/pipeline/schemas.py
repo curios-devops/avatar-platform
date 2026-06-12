@@ -76,6 +76,7 @@ class AvatarBundle(BaseModel):
     eyes: str                    # URL to eyes.glb  (Phase 3)
     teeth: str                   # URL to teeth.glb (Phase 3)
     body: str                    # URL to body.glb  (Phase 3)
+    texture: str = ""            # URL to texture.png (FLAME-UV bake, MVP)
     expression_basis: str = "ARKit_52"
     unmodeled: list[str]         # intentionally unmodeled regions
     preview: str                 # URL to neutral_front.png

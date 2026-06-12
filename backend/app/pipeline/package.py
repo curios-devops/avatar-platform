@@ -181,7 +181,7 @@ def package(
     logger.info("package: building upper body…")
     body_glb = _build_body(flame_params, aligned_image_bytes)
 
-    return {
+    artifacts = {
         "gaussians.ply":                _ply_bytes(gaussian_set),
         "flame_params.json":            flame_json,
         "gaussian_flame_binding.npz":   _binding_npz(gaussian_set),
@@ -190,3 +190,7 @@ def package(
         "body.glb":                     body_glb,
         "neutral_front.png":            _preview_png(aligned_image_bytes),
     }
+    if albedo_bytes:
+        # FLAME-UV texture from texture_bake (consumed by Phase 4 GLB assembly)
+        artifacts["texture.png"] = albedo_bytes
+    return artifacts

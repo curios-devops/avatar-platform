@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 """
-Avatar pipeline worker — photo → FLAME-rigged Gaussian head.
+Avatar pipeline worker — photo → FLAME-rigged avatar (MVP architecture).
 
-Backend selection order (checked at job start, not import time):
+Single GPU dependency: MICA on RunPod (identity shape from multi-view).
+Everything else runs on CPU in this backend:
 
-  Phase 2 path (highest quality):
-    RUNPOD_MICA_ENDPOINT_ID set   → RunPodMICAFitter     (identity from multi-view)
-    RUNPOD_EMOCA_ENDPOINT_ID set  → RunPodEMOCAReconstructor (detailed mesh + albedo)
+  multiview   Nano Banana synthetic views (cloud API, no GPU)
+  mica_fit    RunPod MICA → 300-dim identity shape   [GPU, only RunPod stage]
+  texture     bake frontal photo → FLAME UV texture  (replaces EMOCA albedo)
+  reconstruct LocalReconstructor gaussian sampling   (replaces GPU reconstruct)
+  rig/package/publish — unchanged CPU stages
 
-  Phase 0 / fallback path:
-    RUNPOD_FLAME_ENDPOINT_ID + RUNPOD_RECONSTRUCT_ENDPOINT_ID → DECA + GPU Gaussian
-    ENABLE_LOCAL_WORKER                                         → mediapipe CPU
-    default                                                     → mock sphere
-
-All paths converge at rig → package → publish.
+Fallbacks: MICA unavailable → local mediapipe fitter (or mock when
+MOCK_PIPELINE). See backend/MVP-production-pipeline.md for the decision log.
 """
 import io
 import logging
@@ -42,63 +41,45 @@ logger = logging.getLogger(__name__)
 # ── backend factory helpers ───────────────────────────────────────────────────
 
 def _make_mica_fitter():
-    """Return RunPodMICAFitter if endpoint is configured, else None."""
+    """RunPod MICA — the only GPU stage in the MVP pipeline."""
     if settings.RUNPOD_MICA_ENDPOINT_ID and not settings.MOCK_PIPELINE:
         from ..pipeline.runpod_mica import RunPodMICAFitter
-        logger.info("Phase 2: using RunPodMICAFitter (%s)", settings.RUNPOD_MICA_ENDPOINT_ID)
+        logger.info("Using RunPodMICAFitter (%s)", settings.RUNPOD_MICA_ENDPOINT_ID)
         return RunPodMICAFitter(settings.RUNPOD_MICA_ENDPOINT_ID, settings.RUNPOD_API_KEY)
     return None
 
 
-def _make_emoca_reconstructor():
-    """Return RunPodEMOCAReconstructor if endpoint is configured, else None."""
-    if settings.RUNPOD_EMOCA_ENDPOINT_ID and not settings.MOCK_PIPELINE:
-        from ..pipeline.runpod_emoca import RunPodEMOCAReconstructor
-        logger.info("Phase 2: using RunPodEMOCAReconstructor (%s)", settings.RUNPOD_EMOCA_ENDPOINT_ID)
-        return RunPodEMOCAReconstructor(settings.RUNPOD_EMOCA_ENDPOINT_ID, settings.RUNPOD_API_KEY)
-    return None
-
-
 def _make_fitter():
-    """Phase 0 DECA/local/mock fitter (used when MICA is not configured)."""
-    if (
-        settings.RUNPOD_FLAME_ENDPOINT_ID
-        and settings.RUNPOD_RECONSTRUCT_ENDPOINT_ID
-        and not settings.MOCK_PIPELINE
-    ):
-        from ..pipeline.runpod_fitter import RunPodFlameFitter
-        logger.info("Using RunPodFlameFitter (endpoint %s)", settings.RUNPOD_FLAME_ENDPOINT_ID)
-        return RunPodFlameFitter(settings.RUNPOD_FLAME_ENDPOINT_ID, settings.RUNPOD_API_KEY)
-
-    if settings.ENABLE_LOCAL_WORKER and not settings.MOCK_PIPELINE:
-        from ..pipeline.local_fitter import LocalFlameFitter
-        logger.info("Using LocalFlameFitter (CPU mediapipe)")
-        return LocalFlameFitter()
-
-    logger.info("Using MockFlameFitter (sphere)")
-    return MockFlameFitter()
+    """CPU fallback fitter used when MICA is not configured or fails."""
+    if settings.MOCK_PIPELINE:
+        logger.info("Using MockFlameFitter (sphere)")
+        return MockFlameFitter()
+    from ..pipeline.local_fitter import LocalFlameFitter
+    logger.info("Using LocalFlameFitter (CPU mediapipe)")
+    return LocalFlameFitter()
 
 
 def _make_reconstructor():
-    """Phase 0 GPU/local/mock Gaussian reconstructor."""
-    if (
-        settings.RUNPOD_FLAME_ENDPOINT_ID
-        and settings.RUNPOD_RECONSTRUCT_ENDPOINT_ID
-        and not settings.MOCK_PIPELINE
-    ):
-        from ..pipeline.runpod_reconstructor import RunPodReconstructor
-        logger.info("Using RunPodReconstructor (%s)", settings.RUNPOD_RECONSTRUCT_ENDPOINT_ID)
-        return RunPodReconstructor(
-            settings.RUNPOD_RECONSTRUCT_ENDPOINT_ID, settings.RUNPOD_API_KEY
-        )
+    """Gaussian layer — CPU local sampling by default (MVP decision)."""
+    if settings.MOCK_PIPELINE:
+        logger.info("Using MockReconstructor (sphere)")
+        return MockReconstructor()
+    from ..pipeline.local_reconstructor import LocalReconstructor
+    logger.info("Using LocalReconstructor (CPU mediapipe + photo texture)")
+    return LocalReconstructor()
 
-    if settings.ENABLE_LOCAL_WORKER and not settings.MOCK_PIPELINE:
-        from ..pipeline.local_reconstructor import LocalReconstructor
-        logger.info("Using LocalReconstructor (CPU mediapipe + photo texture)")
-        return LocalReconstructor()
 
-    logger.info("Using MockReconstructor (sphere)")
-    return MockReconstructor()
+def _flat_albedo(aligned_bytes: bytes) -> bytes:
+    """Last-resort albedo: flat mean skin tone sampled from the face centre."""
+    import numpy as np
+    from PIL import Image
+    img = Image.open(io.BytesIO(aligned_bytes)).convert("RGB").resize((512, 512))
+    arr = np.asarray(img, dtype=np.uint8)
+    mean = arr[150:350, 150:350].mean(axis=(0, 1)).astype(np.uint8)
+    out = Image.new("RGB", (512, 512), tuple(mean.tolist()))
+    buf = io.BytesIO()
+    out.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 # ── main pipeline ─────────────────────────────────────────────────────────────
@@ -109,34 +90,28 @@ async def run_avatar_pipeline(
     _progress_offset: float = 0.0,
 ) -> None:
     """
-    Full photo → FLAME-rigged avatar pipeline.
+    Full photo → FLAME-rigged avatar pipeline (MVP).
 
     Stage map (with progress %):
       05  downloading
       10  ingest
       20  preprocess
-      25  multiview       (Sprint 1 — requires OPENAI_API_KEY)
-      35  mica_fit        (Phase 2 — requires RUNPOD_MICA_ENDPOINT_ID)
-           OR flame_fit   (Phase 0 fallback)
-      50  emoca_reconstruct (Phase 2 — requires RUNPOD_EMOCA_ENDPOINT_ID)
-           OR [skipped]   (Phase 0 fallback goes straight to reconstruct)
-      55  reconstruct     (Gaussian splat generation)
+      25  multiview       (Nano Banana — requires GEMINI_API_KEY)
+      35  mica_fit        (RunPod — requires RUNPOD_MICA_ENDPOINT_ID)
+           OR flame_fit   (CPU fallback)
+      50  texture         (CPU bake — replaces EMOCA)
+      55  reconstruct     (CPU gaussian sampling)
       70  rig
-      80  package         (eyes + teeth + body + PLY + flame params)
+      80  package
       90  publish
      100  done
     """
-    mica_fitter     = _make_mica_fitter()
-    emoca_recon     = _make_emoca_reconstructor()
-    phase0_fitter   = _make_fitter()
-    phase0_recon    = _make_reconstructor()
+    mica_fitter = _make_mica_fitter()
+    cpu_fitter = _make_fitter()
+    reconstructor = _make_reconstructor()
 
     def _p(raw: float) -> float:
         return _progress_offset + raw * (1.0 - _progress_offset)
-
-    # Accumulated extras — passed into package() at the end
-    albedo_bytes: bytes | None = None
-    expression_basis: list | None = None
 
     try:
         # ── 1. Download ────────────────────────────────────────────────────────
@@ -165,17 +140,16 @@ async def run_avatar_pipeline(
         _stage(job_id, _p(0.20), "preprocess")
         aligned_bytes = preprocess(image_bytes, result.face_bbox)
 
-        # ── 3b. Multi-view synthesis ───────────────────────────────────────────
-        # Generates side views for MICA and for the frontend orbit animation.
-        # Keeps bytes in memory (for MICA) and uploads URLs (for frontend).
+        # ── 3b. Multi-view synthesis (Nano Banana) ─────────────────────────────
+        # Keeps bytes in memory (for MICA) and uploads URLs (for frontend orbit).
         multiview_bytes: dict[str, bytes] = {"front": aligned_bytes}
 
-        if settings.OPENAI_API_KEY:
+        if settings.GEMINI_API_KEY or settings.OPENAI_API_KEY:
             _stage(job_id, _p(0.25), "multiview")
             try:
                 from ..pipeline.multiview_generator import MultiViewGenerator
-                gen   = MultiViewGenerator()
-                views = await gen.generate(aligned_bytes, max_concurrent=3)
+                gen = MultiViewGenerator()
+                views = await gen.generate(aligned_bytes, max_concurrent=4)
 
                 multiview_urls: dict[str, str] = {}
                 for angle_key, jpeg in views.items():
@@ -193,13 +167,11 @@ async def run_avatar_pipeline(
                 logger.warning("job=%s multiview failed (non-fatal): %s", job_id, mv_exc)
 
         # ── 4. FLAME identity fit ──────────────────────────────────────────────
-        # Phase 2 path: MICA (stable identity from multi-view)
-        # Phase 0 path: DECA / local mediapipe / mock
         if mica_fitter is not None:
             _stage(job_id, _p(0.35), "mica_fit")
             side_views = {k: v for k, v in multiview_bytes.items() if k != "front"}
             try:
-                mica_result  = await mica_fitter.fit_multiview(aligned_bytes, side_views)
+                mica_result = await mica_fitter.fit_multiview(aligned_bytes, side_views)
                 flame_params = FlameParams(
                     shape      = mica_result.shape,
                     expression = [0.0] * 100,
@@ -208,43 +180,25 @@ async def run_avatar_pipeline(
                 )
                 logger.info("job=%s MICA done, shape[0]=%.4f", job_id, mica_result.shape[0])
             except Exception as exc:
-                logger.warning("job=%s MICA failed (%s) — falling back to DECA", job_id, exc)
+                logger.warning("job=%s MICA failed (%s) — CPU fitter fallback", job_id, exc)
                 _stage(job_id, _p(0.35), "flame_fit")
-                flame_params = await flame_fit(aligned_bytes, phase0_fitter)
+                flame_params = await flame_fit(aligned_bytes, cpu_fitter)
         else:
             _stage(job_id, _p(0.35), "flame_fit")
-            flame_params = await flame_fit(aligned_bytes, phase0_fitter)
+            flame_params = await flame_fit(aligned_bytes, cpu_fitter)
 
-        # ── 5. EMOCA detailed reconstruction ──────────────────────────────────
-        # Phase 2: updates flame_params with EMOCA expression/pose/tex,
-        #          produces high-quality albedo texture and expression PCA basis.
-        # Phase 0: runs local CPU fallback that samples albedo from the photo.
-        if emoca_recon is not None:
-            _stage(job_id, _p(0.50), "emoca_reconstruct")
-            try:
-                emoca_result     = await emoca_recon.reconstruct(aligned_bytes, flame_params)
-                flame_params     = emoca_result.flame_params
-                albedo_bytes     = emoca_result.albedo_jpeg
-                expression_basis = emoca_result.expression_basis
-                logger.info(
-                    "job=%s EMOCA done, albedo=%d bytes, expr_basis=%s",
-                    job_id, len(albedo_bytes),
-                    "yes" if expression_basis else "no",
-                )
-            except Exception as exc:
-                logger.warning("job=%s EMOCA failed (%s) — using CPU fallback", job_id, exc)
-                from ..pipeline.runpod_emoca import emoca_fallback
-                er = emoca_fallback(aligned_bytes, flame_params)
-                albedo_bytes = er.albedo_jpeg
-        else:
-            # Always run the CPU fallback so albedo_bytes is never None
-            from ..pipeline.runpod_emoca import emoca_fallback
-            er = emoca_fallback(aligned_bytes, flame_params)
-            albedo_bytes = er.albedo_jpeg
+        # ── 5. Texture bake (CPU — replaces EMOCA albedo) ─────────────────────
+        _stage(job_id, _p(0.50), "texture")
+        try:
+            from ..pipeline.texture_bake import bake_texture
+            albedo_bytes = bake_texture(aligned_bytes, flame_params)
+        except Exception as exc:
+            logger.warning("job=%s texture bake failed (%s) — flat albedo", job_id, exc)
+            albedo_bytes = _flat_albedo(aligned_bytes)
 
-        # ── 6. Gaussian reconstruction ─────────────────────────────────────────
+        # ── 6. Gaussian reconstruction (CPU) ──────────────────────────────────
         _stage(job_id, _p(0.55), "reconstruct")
-        gaussian_set = await reconstruct(aligned_bytes, flame_params, phase0_recon)
+        gaussian_set = await reconstruct(aligned_bytes, flame_params, reconstructor)
         logger.info("job=%s reconstructed %d gaussians", job_id, len(gaussian_set.gaussians))
 
         # ── 7. Rig ────────────────────────────────────────────────────────────
@@ -265,13 +219,8 @@ async def run_avatar_pipeline(
         _stage(job_id, _p(0.90), "publish")
         bundle = publish(job_id, artifacts, storage_service.upload_fileobj)
 
-        # Attach expression_basis URL to result if available (for Phase 4 blendshapes)
-        result_dict = bundle.model_dump()
-        if expression_basis is not None:
-            result_dict["has_expression_basis"] = True
-
         queue_service.update_job_status(
-            job_id, "done", progress=1.0, result=result_dict,
+            job_id, "done", progress=1.0, result=bundle.model_dump(),
         )
         logger.info("job=%s done — preview: %s", job_id, bundle.preview)
 

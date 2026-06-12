@@ -35,6 +35,13 @@ import numpy as np
 import runpod  # type: ignore[import]
 from PIL import Image
 
+# Register fake chumpy modules BEFORE MICA's flame.py unpickles FLAME2020 pkl
+# (real chumpy doesn't build on modern numpy). No-op if real chumpy exists.
+try:
+    import chumpy_stub  # noqa: F401
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 # ── weight paths (override via env vars) ─────────────────────────────────────
@@ -326,6 +333,20 @@ _MICA_PREFERRED = ["left_60", "right_60", "left_30", "right_30", "left_90"]
 _MICA_MAX_VIEWS = 5
 
 
+def _mica_data_path(p: str) -> str:
+    """Resolve MICA's relative data paths (e.g. 'data/FLAME2020/generic_model.pkl')
+    against the weights volume first, then the cloned repo."""
+    mica_repo = os.getenv("MICA_REPO_PATH", "/opt/MICA")
+    if os.path.isabs(p) and os.path.exists(p):
+        return p
+    rel = p[len("data/"):] if p.startswith("data/") else p
+    for base in (MICA_WEIGHTS, os.path.join(mica_repo, "data")):
+        cand = os.path.join(base, rel)
+        if os.path.exists(cand):
+            return cand
+    return p
+
+
 def _load_mica():
     """Load MICA model + insightface ArcFace app. Raises on missing weights."""
     global _mica, _arc
@@ -351,33 +372,55 @@ def _load_mica():
         det_size=(224, 224),
     )
 
-    # MICA model
-    from mica.models.mica import MICA as MICAModel  # type: ignore[import]
-    from mica.config import get_cfg_defaults         # type: ignore[import]
+    # MICA model — repo layout (PYTHONPATH=/opt/MICA):
+    #   configs/config.py        → get_cfg_defaults()
+    #   micalib/models/mica.py   → class MICA(cfg, device)
+    from configs.config import get_cfg_defaults  # type: ignore[import]
+    from utils import util as mica_util          # type: ignore[import]
 
     cfg = get_cfg_defaults()
     cfg.model.testing = True
 
-    ckpt_path = os.path.join(MICA_WEIGHTS, "mica.tar")
-    ckpt  = torch.load(ckpt_path, map_location="cpu")
-    state = ckpt.get("state_dict", ckpt.get("model", ckpt))
+    # Resolve relative data paths (FLAME pkl, head template, lmk embeddings)
+    for attr in ("topology_path", "flame_model_path", "flame_lmk_embedding_path"):
+        if hasattr(cfg.model, attr):
+            setattr(cfg.model, attr, _mica_data_path(getattr(cfg.model, attr)))
 
-    _mica = MICAModel(cfg)
-    _mica.load_state_dict(state, strict=False)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    _mica  = _mica.to(device).eval()
+    _mica = mica_util.find_model_using_name(
+        model_dir="micalib.models", model_name=cfg.model.name
+    )(cfg, device)
 
+    # Checkpoint keys per Zielon/MICA demo.py: 'arcface' + 'flameModel'
+    ckpt_path = os.path.join(MICA_WEIGHTS, "mica.tar")
+    ckpt = torch.load(ckpt_path, map_location=device)
+    if "arcface" in ckpt:
+        _mica.arcface.load_state_dict(ckpt["arcface"])
+    if "flameModel" in ckpt:
+        _mica.flameModel.load_state_dict(ckpt["flameModel"])
+    if "arcface" not in ckpt and "flameModel" not in ckpt:
+        _mica.load_state_dict(ckpt.get("state_dict", ckpt), strict=False)
+
+    _mica = _mica.to(device).eval()
     logger.info("MICA loaded from %s", MICA_WEIGHTS)
     return _mica, _arc
 
 
-def _arcface_crop(img_np: np.ndarray, arc_app) -> np.ndarray | None:
-    """Detect face, return 112×112 ArcFace-normalised crop or None."""
+def _arcface_crop(img_rgb: np.ndarray, arc_app) -> np.ndarray | None:
+    """Detect face, return 112×112 ArcFace input (3,112,112) float32 or None.
+
+    Matches MICA's get_arcface_input: BGR detection, norm_crop, then
+    (RGB - 127.5) / 127.5 normalisation, channels-first.
+    """
     from insightface.utils import face_align  # type: ignore[import]
-    faces = arc_app.get(img_np)
+    img_bgr = img_rgb[:, :, ::-1]
+    faces = arc_app.get(img_bgr)
     if not faces:
         return None
-    return face_align.norm_crop(img_np, faces[0].kps, image_size=112)
+    crop_bgr = face_align.norm_crop(img_bgr, faces[0].kps, image_size=112)
+    crop_rgb = crop_bgr[:, :, ::-1].astype(np.float32)
+    blob = (crop_rgb - 127.5) / 127.5
+    return blob.transpose(2, 0, 1)  # (3, 112, 112)
 
 
 def _handle_mica_fit(inp: dict) -> dict:
@@ -406,7 +449,7 @@ def _handle_mica_fit(inp: dict) -> dict:
                 selected[k] = v
         all_views.extend(selected.items())
 
-        # Extract ArcFace embeddings
+        # Extract ArcFace-normalised inputs (3,112,112) per view
         crops: list[np.ndarray] = []
         for key, b64 in all_views:
             try:
@@ -422,24 +465,22 @@ def _handle_mica_fit(inp: dict) -> dict:
         if not crops:
             raise ValueError("No valid face crops from any view")
 
-        # Normalise crops → (N, 3, 112, 112) float32 [0,1]
-        tensors = []
-        for c in crops:
-            arr = np.array(c, dtype=np.float32) / 255.0
-            tensors.append(torch.from_numpy(arr).permute(2, 0, 1))
-        batch = torch.stack(tensors).to(device)
+        arcface_batch = torch.from_numpy(
+            np.stack(crops).astype(np.float32)
+        ).to(device)
+        # MICA stores `images` in the codedict but identity comes from arcface;
+        # a zero batch keeps decode() happy without the 224px crops.
+        images_dummy = torch.zeros(
+            len(crops), 3, 224, 224, dtype=torch.float32, device=device
+        )
 
         with torch.no_grad():
-            output = mica_model(batch)
+            codedict = mica_model.encode(images_dummy, arcface_batch)
+            opdict   = mica_model.decode(codedict, 0)
 
-        # Support dict or tensor output
-        if isinstance(output, dict):
-            shape_t = output.get("pred_shape_code", output.get("shape"))
-        else:
-            shape_t = output
-
+        shape_t = opdict.get("pred_shape_code")
         if shape_t is None:
-            raise ValueError("MICA returned unexpected output format")
+            raise ValueError("MICA decode() returned no pred_shape_code")
 
         # Average across views, flatten to list
         shape_np = shape_t.mean(0).squeeze().cpu().numpy()

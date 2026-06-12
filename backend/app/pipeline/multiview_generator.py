@@ -1,11 +1,16 @@
 """
 Multi-view synthesis from a single frontal portrait.
 
-Generates up to 9 synthetic views using OpenAI gpt-image-1 (images.edit)
-so MICA/EMOCA can reconstruct a stable 3-D identity from multiple angles.
+Generates 8 synthetic views so MICA can reconstruct a stable 3-D identity
+from multiple angles, and so the texture bake has angular coverage.
+
+Generator chain (first available wins per view):
+  1. Nano Banana (gemini-2.5-flash-image) — best identity/geometric consistency
+  2. OpenAI images.edit (gpt-image-2, degrades to gpt-image-1 if unavailable)
+  3. Local horizontal mirror (±90° profiles only, last resort)
 
 Important — these images are reconstruction aids ONLY.
-They are never texture-mapped onto the final avatar.
+They are never texture-mapped onto the final avatar directly.
 
 Angle scheme
 ────────────
@@ -26,12 +31,19 @@ import asyncio
 import base64
 import io
 import logging
-from dataclasses import dataclass
 
-import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_IMAGE_MODEL}:generateContent"
+)
+
+# OpenAI fallback — tried in order until one model is accepted by the account
+OPENAI_IMAGE_MODELS = ["gpt-image-2", "gpt-image-1"]
 
 # (angle_key, yaw_deg, pitch_deg)
 VIEW_ANGLES: list[tuple[str, int, int]] = [
@@ -59,24 +71,35 @@ _PITCH_DESCRIPTIONS = {
 }
 
 _BASE_SUFFIX = (
-    "Same person, identical facial features, skin tone, hair colour, "
+    "Same person, identical facial features, skin tone, hair colour and style, "
     "eye colour, and expression. Neutral expression. "
-    "Even studio lighting, plain background. "
-    "Photorealistic portrait, high resolution."
+    "Keep the exact same head size and framing as the input photo. "
+    "Even studio lighting, plain neutral background. "
+    "Photorealistic portrait photograph, high resolution."
 )
 
 
 def _angle_prompt(yaw: int, pitch: int) -> str:
     if pitch != 0:
-        return f"The exact same person, {_PITCH_DESCRIPTIONS[pitch]}. {_BASE_SUFFIX}"
+        return (
+            f"Rotate this person's head: {_PITCH_DESCRIPTIONS[pitch]}. "
+            f"{_BASE_SUFFIX}"
+        )
     return (
-        f"The exact same person, head turned: {_YAW_DESCRIPTIONS[yaw]}. "
+        f"Rotate this person's head: {_YAW_DESCRIPTIONS[yaw]}. "
         f"{_BASE_SUFFIX}"
     )
 
 
+def _to_jpeg(image_bytes: bytes, quality: int = 90) -> bytes:
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=quality)
+    return buf.getvalue()
+
+
 def _mirror_fallback(frontal: bytes, yaw: int) -> bytes:
-    """Simple horizontal mirror for ±90° profiles when API fails."""
+    """Simple horizontal mirror for ±90° profiles when all APIs fail."""
     img = Image.open(io.BytesIO(frontal)).convert("RGB")
     if yaw < 0:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
@@ -85,48 +108,79 @@ def _mirror_fallback(frontal: bytes, yaw: int) -> bytes:
     return buf.getvalue()
 
 
+# ── Nano Banana (Gemini) ──────────────────────────────────────────────────────
+
+async def _gemini_edit(
+    client, api_key: str, frontal_jpeg: bytes, prompt: str
+) -> bytes | None:
+    """One Nano Banana image edit. Returns JPEG bytes or None on failure."""
+    payload = {
+        "contents": [{
+            "parts": [
+                {"inline_data": {
+                    "mime_type": "image/jpeg",
+                    "data": base64.b64encode(frontal_jpeg).decode(),
+                }},
+                {"text": prompt},
+            ],
+        }],
+        "generationConfig": {"responseModalities": ["IMAGE"]},
+    }
+    resp = await client.post(
+        GEMINI_URL,
+        json=payload,
+        headers={"x-goog-api-key": api_key},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    for cand in data.get("candidates", []):
+        for part in cand.get("content", {}).get("parts", []):
+            inline = part.get("inlineData") or part.get("inline_data")
+            if inline and inline.get("mimeType", inline.get("mime_type", "")).startswith("image/"):
+                return _to_jpeg(base64.b64decode(inline["data"]))
+    return None
+
+
+# ── OpenAI fallback ───────────────────────────────────────────────────────────
+
+async def _openai_edit(
+    openai_client, frontal_png: bytes, prompt: str
+) -> bytes | None:
+    """OpenAI images.edit, trying newest model first. JPEG bytes or None."""
+    for model in OPENAI_IMAGE_MODELS:
+        try:
+            resp = await openai_client.images.edit(
+                model=model,
+                image=("frontal.png", frontal_png, "image/png"),
+                prompt=prompt,
+                n=1,
+                size="1024x1024",
+            )
+            b64 = resp.data[0].b64_json
+            if b64:
+                return _to_jpeg(base64.b64decode(b64))
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "model" in msg and ("not found" in msg or "does not exist" in msg or "invalid" in msg):
+                logger.info("MultiView: OpenAI model %s unavailable, trying next", model)
+                continue
+            logger.warning("MultiView: OpenAI edit failed (%s): %s", model, exc)
+            return None
+    return None
+
+
 def _png_from_jpeg(jpeg_bytes: bytes) -> bytes:
-    """Convert to RGBA PNG (required by images.edit)."""
+    """Convert to RGBA PNG (required by OpenAI images.edit)."""
     img = Image.open(io.BytesIO(jpeg_bytes)).convert("RGBA").resize((1024, 1024))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
 
 
-async def _generate_one(
-    client,
-    frontal_png: bytes,
-    angle_key: str,
-    yaw: int,
-    pitch: int,
-) -> tuple[str, bytes]:
-    """Call images.edit for one angle; return (angle_key, jpeg_bytes)."""
-    prompt = _angle_prompt(yaw, pitch)
-    logger.info("MultiView: generating %s  yaw=%d pitch=%d", angle_key, yaw, pitch)
-
-    try:
-        resp = await client.images.edit(
-            model="gpt-image-1",
-            image=("frontal.png", frontal_png, "image/png"),
-            prompt=prompt,
-            n=1,
-            size="1024x1024",
-            response_format="b64_json",
-        )
-        png = base64.b64decode(resp.data[0].b64_json)
-        img = Image.open(io.BytesIO(png)).convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=90)
-        return angle_key, buf.getvalue()
-
-    except Exception as exc:
-        logger.warning("MultiView: API failed for %s (%s) — using fallback", angle_key, exc)
-        return angle_key, _mirror_fallback(frontal_png, yaw)
-
-
 class MultiViewGenerator:
     """
-    Generate ~9 synthetic views from a frontal portrait.
+    Generate 8 synthetic views from a frontal portrait.
 
     Usage::
 
@@ -135,61 +189,78 @@ class MultiViewGenerator:
         # views = {"front": <bytes>, "left_30": <bytes>, ...}
 
     The returned dict always contains "front" (= the original image untouched).
-    Other keys are present only if generation succeeds or fallback produces them.
-
-    If OPENAI_API_KEY is not set, the method returns only {"front": frontal_bytes}.
+    Per-view generator chain: Nano Banana → OpenAI → mirror (±90° only).
     """
 
     async def generate(
         self,
         frontal_bytes: bytes,
         angles: list[tuple[str, int, int]] | None = None,
-        max_concurrent: int = 3,
+        max_concurrent: int = 4,
     ) -> dict[str, bytes]:
-        """
-        Args:
-            frontal_bytes:   JPEG/PNG bytes of the frontal portrait.
-            angles:          Override default angle list (for testing).
-            max_concurrent:  Max parallel OpenAI requests (default 3 to
-                             avoid rate-limit on free tier).
-
-        Returns:
-            dict mapping angle key → JPEG bytes.
-            "front" is always included (original image, not re-generated).
-        """
-        from openai import AsyncOpenAI
+        import httpx
         from ..config import settings
 
         results: dict[str, bytes] = {"front": frontal_bytes}
 
-        api_key = settings.OPENAI_API_KEY
-        if not api_key:
-            logger.warning("MultiView: OPENAI_API_KEY not set — returning frontal only")
+        gemini_key = settings.GEMINI_API_KEY
+        openai_key = settings.OPENAI_API_KEY
+        if not gemini_key and not openai_key:
+            logger.warning("MultiView: no GEMINI/OPENAI key — returning frontal only")
             return results
 
-        client = AsyncOpenAI(api_key=api_key)
-        frontal_png = _png_from_jpeg(frontal_bytes)
+        frontal_jpeg = _to_jpeg(frontal_bytes, quality=95)
+        frontal_png = _png_from_jpeg(frontal_bytes) if openai_key else b""
         target_angles = angles if angles is not None else VIEW_ANGLES
 
-        # Throttle with a semaphore to respect rate limits
+        openai_client = None
+        if openai_key:
+            from openai import AsyncOpenAI
+            openai_client = AsyncOpenAI(api_key=openai_key)
+
         sem = asyncio.Semaphore(max_concurrent)
 
-        async def _throttled(key: str, yaw: int, pitch: int):
+        async def _one(http: httpx.AsyncClient, key: str, yaw: int, pitch: int):
+            prompt = _angle_prompt(yaw, pitch)
             async with sem:
-                return await _generate_one(client, frontal_png, key, yaw, pitch)
+                # 1. Nano Banana
+                if gemini_key:
+                    try:
+                        jpeg = await _gemini_edit(http, gemini_key, frontal_jpeg, prompt)
+                        if jpeg:
+                            return key, jpeg
+                        logger.warning("MultiView: Nano Banana returned no image for %s", key)
+                    except Exception as exc:
+                        logger.warning("MultiView: Nano Banana failed for %s: %s", key, exc)
 
-        tasks = [
-            asyncio.create_task(_throttled(key, yaw, pitch))
-            for key, yaw, pitch in target_angles
-        ]
+                # 2. OpenAI
+                if openai_client:
+                    jpeg = await _openai_edit(openai_client, frontal_png, prompt)
+                    if jpeg:
+                        return key, jpeg
 
-        done = await asyncio.gather(*tasks, return_exceptions=True)
+                # 3. Mirror (profiles only)
+                if abs(yaw) == 90:
+                    logger.warning("MultiView: using mirror fallback for %s", key)
+                    return key, _mirror_fallback(frontal_bytes, yaw)
+                return key, None
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(90, read=90)) as http:
+            tasks = [
+                asyncio.create_task(_one(http, key, yaw, pitch))
+                for key, yaw, pitch in target_angles
+            ]
+            done = await asyncio.gather(*tasks, return_exceptions=True)
+
         for result in done:
             if isinstance(result, Exception):
                 logger.error("MultiView: unexpected error: %s", result)
                 continue
             key, jpeg = result
-            results[key] = jpeg
+            if jpeg is not None:
+                results[key] = jpeg
 
-        logger.info("MultiView: generated %d / %d views", len(results) - 1, len(target_angles))
+        logger.info(
+            "MultiView: generated %d / %d views", len(results) - 1, len(target_angles)
+        )
         return results
