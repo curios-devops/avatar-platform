@@ -60,13 +60,17 @@ def _make_fitter():
 
 
 def _make_reconstructor():
-    """Gaussian layer — CPU local sampling by default (MVP decision)."""
+    """Gaussian layer — CPU FLAME-mesh sampling by default (MVP decision).
+
+    FlameMeshReconstructor needs no face detection (mesh comes from the
+    identity fit) and binds gaussians to real FLAME triangles.
+    """
     if settings.MOCK_PIPELINE:
         logger.info("Using MockReconstructor (sphere)")
         return MockReconstructor()
-    from ..pipeline.local_reconstructor import LocalReconstructor
-    logger.info("Using LocalReconstructor (CPU mediapipe + photo texture)")
-    return LocalReconstructor()
+    from ..pipeline.flame_reconstructor import FlameMeshReconstructor
+    logger.info("Using FlameMeshReconstructor (CPU, FLAME mesh + photo)")
+    return FlameMeshReconstructor()
 
 
 def _flat_albedo(aligned_bytes: bytes) -> bytes:
