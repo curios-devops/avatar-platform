@@ -58,6 +58,18 @@ def ensure_weights() -> None:
         except Exception as exc:
             logger.warning("bootstrap: %s failed (%s) — continuing", env_key, exc)
 
+    # MICA looks for FLAME in its local data/ dir — symlink to volume weights
+    mica_data = "/opt/MICA/data"
+    os.makedirs(mica_data, exist_ok=True)
+    flame_link = os.path.join(mica_data, "FLAME2020")
+    flame_real = os.path.join(MICA_WEIGHTS, "FLAME2020")
+    if not os.path.exists(flame_link) and os.path.isdir(flame_real):
+        try:
+            os.symlink(flame_real, flame_link)
+            logger.info("bootstrap: symlinked FLAME2020 to %s", flame_link)
+        except FileExistsError:
+            pass
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
