@@ -63,12 +63,14 @@ def ensure_weights() -> None:
     os.makedirs(mica_data, exist_ok=True)
     flame_link = os.path.join(mica_data, "FLAME2020")
     flame_real = os.path.join(MICA_WEIGHTS, "FLAME2020")
+    logger.info("bootstrap: flame_real=%s exists=%s isdir=%s", flame_real, os.path.exists(flame_real), os.path.isdir(flame_real))
+    logger.info("bootstrap: flame_link=%s exists=%s", flame_link, os.path.exists(flame_link))
     if not os.path.exists(flame_link) and os.path.isdir(flame_real):
         try:
             os.symlink(flame_real, flame_link)
             logger.info("bootstrap: symlinked FLAME2020 to %s", flame_link)
-        except FileExistsError:
-            pass
+        except Exception as exc:
+            logger.warning("bootstrap: symlink failed: %s", exc)
 
 
 if __name__ == "__main__":
