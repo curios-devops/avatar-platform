@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { MultiViewOrbit } from '../components/MultiViewOrbit';
 
 interface UploadProps {
@@ -107,6 +107,13 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
   const [resultJobId, setResultJobId]   = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [multiviewImages, setMultiviewImages] = useState<Record<string, string> | null>(null);
+  const [mvCount, setMvCount] = useState<{ done: number; total: number } | null>(null);
+
+  // Boot the LAM GPU worker while the user is still picking a photo —
+  // backend throttles repeats, endpoint idleTimeout keeps it warm 10 min.
+  useEffect(() => {
+    fetch(`${serverUrl}/api/v1/avatar/warmup`, { method: 'POST' }).catch(() => {});
+  }, [serverUrl]);
 
   // ── camera ───────────────────────────────────────────────────────────────────
   const startPhotoCamera = async () => {
@@ -253,6 +260,9 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
         setProgress(Math.round((job.progress ?? 0) * 100));
         if (job.result?.stage) setCurrentStage(job.result.stage);
         if (job.result?.multiview_images) setMultiviewImages(job.result.multiview_images);
+        if (job.result?.multiview_total) {
+          setMvCount({ done: job.result.multiview_done ?? 0, total: job.result.multiview_total });
+        }
         if (job.status === 'done') {
           clearInterval(iv);
           setPreviewUrl(job.result?.preview ?? null);
@@ -279,6 +289,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
     setPreviewUrl(null); setGaussiansUrl(null);
     setResultJobId(null); setError(null);
     setMultiviewImages(null);
+    setMvCount(null);
     setPreset(null); setCustomDesc('');
   };
 
@@ -409,6 +420,11 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                   display: 'flex', gap: 4, alignItems: 'center',
                 }}>
                   {done ? '✓' : s.icon} {s.label}
+                  {s.key === 'multiview' && current && mvCount && (
+                    <span style={{ fontVariantNumeric: 'tabular-nums', opacity: 0.85 }}>
+                      {mvCount.done}/{mvCount.total}
+                    </span>
+                  )}
                 </div>
               );
             })}

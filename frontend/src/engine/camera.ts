@@ -6,19 +6,26 @@
  */
 
 export class Camera {
-  private fov    = 45 * (Math.PI / 180);
+  // Portrait-lens setup: narrow FOV from further back. A wide FOV at 0.3 m
+  // renders faces like a selfie lens — huge nose, stretched centre.
+  private fov    = 22 * (Math.PI / 180);
   private aspect = 16 / 9;
   private near   = 0.01;   // 1 cm
   private far    = 10;     // 10 m
 
   // Orbit state
   private rotX   = 0;      // vertical   (pitch)
+  // Avatars face +z (canonical convention — verified against LAM output and a
+  // reference viewer, docs/lam-migration.md). Camera starts at +z, facing them.
   private rotY   = 0;      // horizontal (yaw)
-  private distance = 0.3;  // metres from target — head is ~10 cm radius
+  private distance = 0.65;  // metres from target — same framing as 45°@0.3 m
 
   private isDragging = false;
   private lastX = 0;
   private lastY = 0;
+
+  /** Keep projection in sync when the canvas backing store is resized. */
+  setAspect(aspect: number) { this.aspect = aspect; }
 
   constructor(canvas: HTMLCanvasElement) {
     this.aspect = canvas.width / canvas.height;
@@ -87,7 +94,8 @@ export class Camera {
   private _up()               { this.isDragging = false; }
   private _wheel(e: WheelEvent) {
     e.preventDefault();
-    this.distance = Math.max(0.05, Math.min(2, this.distance + e.deltaY * 0.001));
+    // Min 0.25 m keeps perspective distortion of the face acceptable
+    this.distance = Math.max(0.25, Math.min(2, this.distance + e.deltaY * 0.001));
   }
 }
 

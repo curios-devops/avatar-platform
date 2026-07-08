@@ -25,6 +25,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
 }) => {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<WebGPURenderer | null>(null);
+  const cameraRef   = useRef<Camera | null>(null);
   const streamRef   = useRef<AnimationStream | null>(null);
   const rafRef      = useRef<number>(0);
 
@@ -60,16 +61,39 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
     let frames = 0;
     let fpsTimer = performance.now();
 
+    let resizeObs: ResizeObserver | null = null;
+
     const init = async () => {
       if (!canvasRef.current || cancelled) return;
       try {
         setStage('Initialising WebGPU…');
-        const renderer = new WebGPURenderer(canvasRef.current);
+
+        // Render at native resolution: backing store = CSS size × dpr
+        // (capped at 2× — beyond that the per-frame depth sort pays for
+        // pixels nobody can see). WebGPU picks the new size up automatically
+        // via getCurrentTexture(); the shader reads it from canvas.width.
+        const canvas = canvasRef.current;
+        const fitCanvas = () => {
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const w = Math.round(canvas.clientWidth * dpr);
+          const h = Math.round(canvas.clientHeight * dpr);
+          if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+            canvas.width = w;
+            canvas.height = h;
+            cameraRef.current?.setAspect(w / h);
+          }
+        };
+        fitCanvas();
+
+        const renderer = new WebGPURenderer(canvas);
         const ok = await renderer.initialize();
         if (!ok || cancelled) { renderer.destroy(); return; }
         rendererRef.current = renderer;
 
-        const camera = new Camera(canvasRef.current);
+        const camera = new Camera(canvas);
+        cameraRef.current = camera;
+        resizeObs = new ResizeObserver(fitCanvas);
+        resizeObs.observe(canvas);
 
         setStage('Loading avatar data…');
         const loader    = new SplatLoader();
@@ -127,6 +151,8 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
+      resizeObs?.disconnect();
+      cameraRef.current = null;
       rendererRef.current?.destroy();
       rendererRef.current = null;
       streamRef.current?.disconnect();

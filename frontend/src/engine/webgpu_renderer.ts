@@ -23,6 +23,7 @@ export class WebGPURenderer {
   private cameraUniformBuffer!: GPUBuffer;
   private speakBuffer!: GPUBuffer;
   private indexBuffer!: GPUBuffer;        // sorted splat indices (u32 per splat)
+  private rotationBuffer!: GPUBuffer;     // quaternions (w,x,y,z) per splat
   private bindGroup!: GPUBindGroup;
 
   // CPU-side data for per-frame depth sort
@@ -122,6 +123,11 @@ export class WebGPURenderer {
     this.positionBuffer = this._buf(pos4,        GPUBufferUsage.STORAGE);
     this.scaleBuffer    = this._buf(scl4,        GPUBufferUsage.STORAGE);
     this.colorBuffer    = this._buf(data.colors, GPUBufferUsage.STORAGE);
+    // Quaternions (w,x,y,z) per splat — anisotropic covariance needs them
+    this.rotationBuffer = this._buf(
+      data.rotations ?? new Float32Array(data.count * 4),
+      GPUBufferUsage.STORAGE,
+    );
 
     this.cameraUniformBuffer = this.device.createBuffer({
       size: 128,   // 2 × mat4x4<f32>
@@ -154,6 +160,7 @@ export class WebGPURenderer {
         { binding: 3, resource: { buffer: this.colorBuffer } },
         { binding: 4, resource: { buffer: this.speakBuffer } },
         { binding: 5, resource: { buffer: this.indexBuffer } },
+        { binding: 6, resource: { buffer: this.rotationBuffer } },
       ],
     });
 
@@ -171,12 +178,9 @@ export class WebGPURenderer {
 
   /** Drive jaw animation from audio amplitude [0, 1]. Call every RAF frame. */
   setAmplitude(v: number) {
-    if (!this.speakBuffer) return;
-    this.device.queue.writeBuffer(
-      this.speakBuffer, 0,
-      new Float32Array([Math.max(0, Math.min(1, v)), 0, 0, 0]),
-    );
+    this._amplitude = Math.max(0, Math.min(1, v));
   }
+  private _amplitude = 0;
 
   updateDeformation(positions?: Float32Array) {
     if (positions) this.device.queue.writeBuffer(this.positionBuffer, 0, positions);
@@ -190,6 +194,12 @@ export class WebGPURenderer {
     // camera's Z-axis in world space.  Dot-product with each splat position
     // gives view-space z; sort descending = back-to-front.
     this._depthSort();
+
+    // amplitude + viewport size (shader needs pixels for covariance focal)
+    this.device.queue.writeBuffer(
+      this.speakBuffer, 0,
+      new Float32Array([this._amplitude, this.canvas.width, this.canvas.height, 0]),
+    );
 
     const enc  = this.device.createCommandEncoder();
     const pass = enc.beginRenderPass({
@@ -261,6 +271,7 @@ export class WebGPURenderer {
     this.cameraUniformBuffer?.destroy();
     this.speakBuffer?.destroy();
     this.indexBuffer?.destroy();
+    this.rotationBuffer?.destroy();
 
   }
 }
@@ -272,8 +283,8 @@ struct Camera {
   projection: mat4x4<f32>,
 }
 
-// u_speak.x = jaw amplitude [0,1] — drives lower-face displacement
-struct Speak { amplitude: f32, _p0: f32, _p1: f32, _p2: f32 }
+// u_speak: x = jaw amplitude [0,1], y/z = viewport width/height in pixels
+struct Speak { amplitude: f32, vp_w: f32, vp_h: f32, _p2: f32 }
 
 @group(0) @binding(0) var<uniform>       camera:         Camera;
 @group(0) @binding(1) var<storage, read> positions:      array<vec4<f32>>;
@@ -281,6 +292,7 @@ struct Speak { amplitude: f32, _p0: f32, _p1: f32, _p2: f32 }
 @group(0) @binding(3) var<storage, read> colors:         array<vec4<f32>>;
 @group(0) @binding(4) var<uniform>       u_speak:        Speak;
 @group(0) @binding(5) var<storage, read> sorted_indices: array<u32>;
+@group(0) @binding(6) var<storage, read> rotations:      array<vec4<f32>>;
 
 struct VOut {
   @builtin(position) pos:   vec4<f32>,
@@ -288,20 +300,22 @@ struct VOut {
   @location(1)       uv:    vec2<f32>,
 }
 
+// Full anisotropic 3DGS rasterisation (EWA splatting, as in the reference
+// INRIA/antimatter15 implementations): project each gaussian's 3D covariance
+// R·S·Sᵀ·Rᵀ through the view + perspective Jacobian, eigen-decompose the 2D
+// covariance, and stretch the quad along the ellipse axes.
 @vertex
 fn vs_main(
   @builtin(vertex_index)   vi: u32,
   @builtin(instance_index) ii: u32,
 ) -> VOut {
   var quad = array<vec2<f32>, 4>(
-    vec2<f32>(-1.0, -1.0),
-    vec2<f32>( 1.0, -1.0),
-    vec2<f32>(-1.0,  1.0),
-    vec2<f32>( 1.0,  1.0),
+    vec2<f32>(-2.0, -2.0),
+    vec2<f32>( 2.0, -2.0),
+    vec2<f32>(-2.0,  2.0),
+    vec2<f32>( 2.0,  2.0),
   );
   let corner = quad[vi];
-
-  // Use sorted index so instances are drawn back-to-front
   let si     = sorted_indices[ii];
   var center = positions[si].xyz;
   let scale  = scales[si].xyz;
@@ -311,18 +325,72 @@ fn vs_main(
   let jaw_disp   = u_speak.amplitude * jaw_factor * 0.025;
   center = vec3<f32>(center.x, center.y - jaw_disp, center.z + jaw_disp * 0.4);
 
-  let clip   = camera.projection * camera.view * vec4<f32>(center, 1.0);
-  // Billboard radius in clip space: scale × 3 σ, divided by clip.w for
-  // perspective-correct screen size (clip.w ≈ view-space depth).
-  let radius = max(max(scale.x, scale.y), scale.z) * 3.0;
-
   var out: VOut;
-  out.pos   = vec4<f32>(
-    clip.x + corner.x * radius,
-    clip.y + corner.y * radius,
-    clip.z,
-    clip.w,
+  let cam_pos = camera.view * vec4<f32>(center, 1.0);
+  let clip    = camera.projection * cam_pos;
+  // Cull behind-camera / far outside frustum
+  if (clip.w <= 0.0 || abs(clip.x) > 1.3 * clip.w || abs(clip.y) > 1.3 * clip.w) {
+    out.pos = vec4<f32>(0.0, 0.0, 2.0, 1.0);
+    return out;
+  }
+
+  // 3D covariance: M = R(q)·S  →  Σ = M·Mᵀ   (q stored as w,x,y,z)
+  let q = normalize(rotations[si]);
+  let w = q.x; let x = q.y; let y = q.z; let z = q.w;
+  // Written in row-major reading order; WGSL fills column-major → transpose
+  let R = transpose(mat3x3<f32>(
+    1.0 - 2.0*(y*y + z*z), 2.0*(x*y + w*z),       2.0*(x*z - w*y),
+    2.0*(x*y - w*z),       1.0 - 2.0*(x*x + z*z), 2.0*(y*z + w*x),
+    2.0*(x*z + w*y),       2.0*(y*z - w*x),       1.0 - 2.0*(x*x + y*y),
+  ));
+  let S = mat3x3<f32>(
+    scale.x, 0.0, 0.0,
+    0.0, scale.y, 0.0,
+    0.0, 0.0, scale.z,
   );
+  let M     = R * S;
+  let sigma = M * transpose(M);
+
+  // View rotation (upper-left 3×3 of the view matrix)
+  let W = mat3x3<f32>(camera.view[0].xyz, camera.view[1].xyz, camera.view[2].xyz);
+
+  // Perspective Jacobian at the splat centre (focal lengths in pixels)
+  let focal = vec2<f32>(
+    camera.projection[0][0] * u_speak.vp_w * 0.5,
+    camera.projection[1][1] * u_speak.vp_h * 0.5,
+  );
+  let t  = cam_pos.xyz;
+  // Note -focal.y: compensates the NDC↔pixel y-flip (as in the reference
+  // antimatter15 implementation) — without it ellipse tilts mirror and the
+  // splat grid renders as dark cross-hatching.
+  // Written in row-major reading order; WGSL fills column-major → transpose
+  // (same convention fix as R above — without it the covariance is computed
+  // with Jᵀ and off-centre splats get scrambled ellipses).
+  let J  = transpose(mat3x3<f32>(
+    focal.x / t.z, 0.0, -(focal.x * t.x) / (t.z * t.z),
+    0.0, -focal.y / t.z, (focal.y * t.y) / (t.z * t.z),
+    0.0, 0.0, 0.0,
+  ));
+  let T    = transpose(J * W);
+  let cov4 = transpose(T) * sigma * T;   // 2D covariance (pixels²)
+  let c00 = cov4[0][0] + 0.3;            // +0.3 px anti-alias floor
+  let c11 = cov4[1][1] + 0.3;
+  let c01 = cov4[0][1];
+
+  // Eigen-decomposition → ellipse axes (clamped so one splat can't fill the screen)
+  let mid    = 0.5 * (c00 + c11);
+  let radius = length(vec2<f32>(0.5 * (c00 - c11), c01));
+  let l1     = mid + radius;
+  let l2     = max(mid - radius, 0.1);
+  let diag   = normalize(vec2<f32>(c01, l1 - c00));
+  let v1     = min(sqrt(2.0 * l1), 512.0) * diag;
+  let v2     = min(sqrt(2.0 * l2), 512.0) * vec2<f32>(diag.y, -diag.x);
+
+  let center_ndc = clip.xy / clip.w;
+  // px → NDC: NDC spans 2 units over vp pixels, so scale by 2/vp
+  let offset_ndc = (corner.x * v1 + corner.y * v2) * 2.0 / vec2<f32>(u_speak.vp_w, u_speak.vp_h);
+  out.pos = vec4<f32>(center_ndc + offset_ndc, 0.0, 1.0);
+
   let a     = colors[si].a;
   out.color = vec4<f32>(colors[si].rgb * a, a);
   out.uv    = corner;
@@ -331,9 +399,11 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VOut) -> @location(0) vec4<f32> {
-  let r2    = dot(in.uv, in.uv);
-  let alpha = exp(-2.0 * r2);
-  if alpha < 0.01 { discard; }
-  return vec4<f32>(in.color.rgb, in.color.a * alpha);
+  // uv is in ellipse-normalised units (quad spans ±2σ·√2); standard gaussian
+  let a = -dot(in.uv, in.uv);
+  if (a < -4.0) { discard; }
+  let falloff = exp(a);
+  // Premultiplied blending: rgb carries the same total alpha as the α channel
+  return vec4<f32>(in.color.rgb * falloff, in.color.a * falloff);
 }
 `;

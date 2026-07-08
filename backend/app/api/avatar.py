@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
 from typing import Optional
+import time
 import uuid
 from datetime import datetime
 
@@ -11,6 +12,45 @@ from ..workers.pipeline_worker import run_avatar_pipeline
 from ..workers.generate_worker import run_generate_pipeline
 
 router = APIRouter(prefix="/avatar", tags=["avatar"])
+
+# Last time we pinged the LAM endpoint awake (monotonic seconds).
+# The endpoint's idleTimeout is 600 s, so re-pinging sooner than ~8 min
+# just burns a request; the throttle keeps page reloads free.
+_WARMUP_THROTTLE_S = 8 * 60
+_last_warmup = 0.0
+
+
+@router.post("/warmup")
+async def warmup_lam():
+    """Boot a LAM worker ahead of time (fire-and-forget).
+
+    Called by the frontend when the upload page mounts, so the GPU worker
+    cold-starts while the user is still picking a photo. The worker handler
+    answers unknown job_types with a fast error — that's enough to boot it,
+    and the endpoint's 600 s idleTimeout keeps it warm afterwards.
+    """
+    global _last_warmup
+    from ..config import settings
+
+    if not settings.RUNPOD_LAM_ENDPOINT_ID or settings.MOCK_PIPELINE:
+        return {"warmed": False, "reason": "LAM not configured"}
+    now = time.monotonic()
+    if now - _last_warmup < _WARMUP_THROTTLE_S:
+        return {"warmed": False, "reason": "recently warmed"}
+    _last_warmup = now
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"https://api.runpod.ai/v2/{settings.RUNPOD_LAM_ENDPOINT_ID}/run",
+                json={"input": {"job_type": "warmup"}},
+                headers={"Authorization": f"Bearer {settings.RUNPOD_API_KEY}"},
+            )
+        return {"warmed": True}
+    except Exception as exc:  # warmup is best-effort — never block the UI
+        _last_warmup = 0.0
+        return {"warmed": False, "reason": str(exc)}
 
 
 @router.post("/create", response_model=JobStatus)
