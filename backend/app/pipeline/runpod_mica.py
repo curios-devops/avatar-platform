@@ -128,11 +128,26 @@ class RunPodMICAFitter(FlameFitter):
             logger.info("MICA job submitted: %s", job_id)
             output = await self._poll(client, job_id, _MAX_WAIT)
 
-        shape = output.get("shape", [0.0] * 300)
+        if "error" in output:
+            raise RuntimeError(f"MICA worker returned error: {output['error']}")
+
+        shape = output.get("shape")
+        if not shape:
+            raise RuntimeError(f"MICA worker returned no shape (keys: {list(output)})")
         if len(shape) < 300:
             shape = (list(shape) + [0.0] * 300)[:300]
 
-        logger.info("MICA fit done — shape norm=%.4f", sum(x**2 for x in shape[:10])**0.5)
+        norm = sum(x * x for x in shape) ** 0.5
+        if norm < 1e-6:
+            # Worker's own fallback path: COMPLETED status but all-zero shape
+            # (missing weights/imports on the GPU image). Surface it loudly —
+            # a mean-face avatar otherwise looks like a mysterious quality bug.
+            raise RuntimeError(
+                "MICA worker returned an all-zero (neutral) shape — the GPU "
+                "image is likely missing MICA weights or dependencies"
+            )
+
+        logger.info("MICA fit done — shape norm=%.4f", norm)
         return MICAResult(shape=shape)
 
     # ── RunPod polling ────────────────────────────────────────────────────────

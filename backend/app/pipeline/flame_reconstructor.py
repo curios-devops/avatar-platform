@@ -26,7 +26,12 @@ from PIL import Image
 from . import flame_template
 from .interfaces import Reconstructor
 from .schemas import FlameParams, GaussianSet, GaussianSplat
-from .texture_bake import _bilinear, _project_to_photo, _vertex_normals
+from .texture_bake import (
+    _bilinear,
+    _vertex_normals,
+    backfill_hidden_colors,
+    project_flame_to_photo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,16 +62,15 @@ class FlameMeshReconstructor(Reconstructor):
         faces = tpl.faces.astype(np.int64)                      # (9976, 3)
 
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        photo = np.asarray(img, dtype=np.float32) / 255.0
-        h, w = photo.shape[:2]
+        photo_u8 = np.asarray(img, dtype=np.uint8)
+        photo = photo_u8.astype(np.float32) / 255.0
 
-        # Per-vertex photo colour (orthographic projection, like texture_bake)
-        pix = _project_to_photo(verts, (h, w))
+        # Per-vertex photo colour (landmark-anchored projection, like texture_bake)
+        pix = project_flame_to_photo(verts, photo_u8)
         vert_colors = _bilinear(photo, pix[:, 0], pix[:, 1])    # (V, 3)
         normals = _vertex_normals(verts, faces)
         front = normals[:, 2] > _FRONT_FACING_MIN
-        if front.any():
-            vert_colors[~front] = vert_colors[front].mean(axis=0)
+        vert_colors = backfill_hidden_colors(verts, vert_colors, front)
 
         # Area-weighted triangle sampling
         v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
@@ -91,8 +95,13 @@ class FlameMeshReconstructor(Reconstructor):
                   r3[:, None] * vert_colors[tri[:, 2]])
         sh_dc = (colors - 0.5) / SH_C0
 
-        # Scales 2–6 mm log-uniform; opacity stored as logit (loader sigmoids)
-        log_scales = np.log(rng.uniform(2e-3, 6e-3, N_GAUSSIANS)).astype(np.float32)
+        # Splat size ≈ sampling spacing (area-weighted sampling gives uniform
+        # surface density). Fixed 2–6 mm splats were 2–6× the spacing and
+        # blurred the nose/eyes/lips; 3σ footprints still overlap at ~1.4×.
+        spacing = float(np.sqrt(areas.sum() / N_GAUSSIANS))
+        log_scales = np.log(
+            spacing * rng.uniform(1.1, 1.7, N_GAUSSIANS)
+        ).astype(np.float32)
         target_op = rng.uniform(0.80, 0.95, N_GAUSSIANS).astype(np.float32)
         opacities = np.log(target_op / (1.0 - target_op))
 

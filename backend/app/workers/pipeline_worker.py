@@ -15,6 +15,7 @@ Everything else runs on CPU in this backend:
 Fallbacks: MICA unavailable → local mediapipe fitter (or mock when
 MOCK_PIPELINE). See backend/MVP-production-pipeline.md for the decision log.
 """
+import asyncio
 import io
 import logging
 
@@ -144,28 +145,107 @@ async def run_avatar_pipeline(
         _stage(job_id, _p(0.20), "preprocess")
         aligned_bytes = preprocess(image_bytes, result.face_bbox)
 
+        # ── 3a-bis. LAM one-shot gaussian head (preferred core when configured)
+        # Photo → FLAME-rigged gaussian avatar with hair in one GPU call.
+        # On any failure we fall through to the legacy multiview/MICA path.
+        if settings.RUNPOD_LAM_ENDPOINT_ID and not settings.MOCK_PIPELINE:
+            _stage(job_id, _p(0.30), "lam_reconstruct")
+            try:
+                from ..pipeline.runpod_lam import RunPodLAMClient
+                lam = RunPodLAMClient(
+                    settings.RUNPOD_LAM_ENDPOINT_ID, settings.RUNPOD_API_KEY
+                )
+                ply_bytes = await lam.reconstruct(aligned_bytes)
+
+                _stage(job_id, _p(0.85), "publish")
+                gauss_url = storage_service.upload_fileobj(
+                    io.BytesIO(ply_bytes), f"avatars/{job_id}/gaussians.ply"
+                )
+                from PIL import Image
+                buf = io.BytesIO()
+                Image.open(io.BytesIO(aligned_bytes)).convert("RGB").resize(
+                    (512, 512)
+                ).save(buf, format="PNG")
+                buf.seek(0)
+                preview_url = storage_service.upload_fileobj(
+                    buf, f"avatars/{job_id}/neutral_front.png"
+                )
+                queue_service.update_job_status(
+                    job_id, "done", progress=1.0,
+                    result={
+                        "gaussians": gauss_url,
+                        "preview": preview_url,
+                        "pipeline": "lam",
+                    },
+                )
+                logger.info("job=%s done via LAM — %d KB ply", job_id, len(ply_bytes) // 1024)
+                return
+            except Exception as lam_exc:
+                logger.warning(
+                    "job=%s LAM failed (%s) — falling back to legacy pipeline",
+                    job_id, lam_exc,
+                )
+
         # ── 3b. Multi-view synthesis (Nano Banana) ─────────────────────────────
         # Keeps bytes in memory (for MICA) and uploads URLs (for frontend orbit).
         multiview_bytes: dict[str, bytes] = {"front": aligned_bytes}
 
-        if settings.GEMINI_API_KEY or settings.OPENAI_API_KEY:
+        if settings.gemini_enabled or (settings.OPENAI_API_KEY and settings.OPENAI_IMAGE_FALLBACK):
             _stage(job_id, _p(0.25), "multiview")
             try:
-                from ..pipeline.multiview_generator import MultiViewGenerator
-                gen = MultiViewGenerator()
-                views = await gen.generate(aligned_bytes, max_concurrent=4)
+                from ..pipeline.multiview_generator import VIEW_ANGLES, MultiViewGenerator
 
+                total_views = len(VIEW_ANGLES)
                 multiview_urls: dict[str, str] = {}
-                for angle_key, jpeg in views.items():
-                    multiview_bytes[angle_key] = jpeg
-                    key = f"avatars/{job_id}/multiview/{angle_key}.jpg"
-                    url = storage_service.upload_fileobj(io.BytesIO(jpeg), key)
-                    multiview_urls[angle_key] = url
+                upload_tasks: list[asyncio.Task] = []
+                done_hi = 0
 
-                queue_service.update_job_status(
-                    job_id, "processing", progress=_p(0.28),
-                    result={"stage": "multiview", "multiview_images": multiview_urls},
+                # Upload each view as it settles and publish the accumulated
+                # URL map immediately, so the frontend orbit fills in live.
+                async def _publish_view(angle_key: str, jpeg: bytes, done: int) -> None:
+                    nonlocal done_hi
+                    key = f"avatars/{job_id}/multiview/{angle_key}.jpg"
+                    url = await asyncio.to_thread(
+                        storage_service.upload_fileobj, io.BytesIO(jpeg), key
+                    )
+                    multiview_urls[angle_key] = url
+                    done_hi = max(done_hi, done)
+                    queue_service.update_job_status(
+                        job_id, "processing",
+                        progress=_p(0.25 + 0.03 * done_hi / total_views),
+                        result={"stage": "multiview",
+                                "multiview_done": done_hi,
+                                "multiview_total": total_views,
+                                "multiview_images": dict(multiview_urls)},
+                    )
+
+                # The uploaded photo is the orbit centre — publish it up front
+                await _publish_view("front", aligned_bytes, 0)
+
+                def _on_view(angle_key: str, jpeg: bytes | None, done: int, total: int) -> None:
+                    nonlocal done_hi
+                    if jpeg is not None:
+                        upload_tasks.append(
+                            asyncio.create_task(_publish_view(angle_key, jpeg, done))
+                        )
+                    else:
+                        done_hi = max(done_hi, done)
+                        queue_service.update_job_status(
+                            job_id, "processing",
+                            progress=_p(0.25 + 0.03 * done_hi / total_views),
+                            result={"stage": "multiview",
+                                    "multiview_done": done_hi,
+                                    "multiview_total": total_views},
+                        )
+
+                gen = MultiViewGenerator()
+                views = await gen.generate(
+                    aligned_bytes, max_concurrent=8, on_view=_on_view
                 )
+                multiview_bytes.update(views)
+                if upload_tasks:
+                    await asyncio.gather(*upload_tasks)
+
                 logger.info("job=%s multiview: %d views", job_id, len(multiview_bytes))
             except Exception as mv_exc:
                 logger.warning("job=%s multiview failed (non-fatal): %s", job_id, mv_exc)

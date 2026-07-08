@@ -32,9 +32,23 @@ class Settings(BaseSettings):
 
     # ── OpenAI (Image generation — gpt-image-1) ───────────────────────────────
     OPENAI_API_KEY: Optional[str] = None
+    # Multiview fallback to OpenAI images.edit — OFF by default (burns credits)
+    OPENAI_IMAGE_FALLBACK: bool = False
 
-    # ── Google Gemini (Imagen — image editing/enhancement) ────────────────────
+    # ── Google Gemini (image editing — multiview synthesis + photo enhance) ───
+    # Preferred: Vertex AI via service account (project credits/billing).
+    # Set GCP_PROJECT_ID + GOOGLE_APPLICATION_CREDENTIALS to enable; falls back
+    # to AI Studio with GEMINI_API_KEY (free tier = NO image quota).
+    GCP_PROJECT_ID: Optional[str] = None
+    GCP_LOCATION: str = "global"          # image models are global-only on Vertex
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None  # service-account JSON path
     GEMINI_API_KEY: Optional[str] = None
+    # Nano Banana 2 Lite; override via env to swap models without a deploy
+    GEMINI_IMAGE_MODEL: str = "gemini-3.1-flash-lite-image"
+
+    @property
+    def gemini_enabled(self) -> bool:
+        return bool(self.GCP_PROJECT_ID or self.GEMINI_API_KEY)
 
     # ── RunPod ────────────────────────────────────────────────────────────────
     RUNPOD_API_KEY: str = ""
@@ -42,7 +56,8 @@ class Settings(BaseSettings):
     RUNPOD_FLAME_ENDPOINT_ID: Optional[str] = None          # DECA flame_fit (current)
     RUNPOD_RECONSTRUCT_ENDPOINT_ID: Optional[str] = None    # Gaussian reconstruct (current)
     # Phase 2 — MICA identity + EMOCA detailed face reconstruction
-    RUNPOD_MICA_ENDPOINT_ID: Optional[str] = None           # MICA multi-view identity
+    RUNPOD_MICA_ENDPOINT_ID: Optional[str] = None           # MICA multi-view identity (legacy)
+    RUNPOD_LAM_ENDPOINT_ID: Optional[str] = None            # LAM one-shot gaussian head
     RUNPOD_EMOCA_ENDPOINT_ID: Optional[str] = None          # EMOCA detailed mesh + albedo
 
     MOCK_PIPELINE: bool = False

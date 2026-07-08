@@ -90,6 +90,7 @@ export const MultiViewOrbit: React.FC<Props> = ({ images, converge = false }) =>
             transform: 'translate(-50%, -50%)',
             border: '2px solid rgba(167,139,250,0.8)',
             boxShadow: '0 0 20px rgba(124,58,237,0.5)',
+            animation: 'pop 0.45s ease',
             zIndex: 10,
           }}
         />
@@ -133,6 +134,8 @@ export const MultiViewOrbit: React.FC<Props> = ({ images, converge = false }) =>
               transition: converge
                 ? 'left 0.6s ease-in, top 0.6s ease-in, opacity 0.5s ease-in'
                 : 'none',
+              // pop-in as each generated view arrives (keyframes from Upload.tsx)
+              animation: converge ? 'none' : 'pop 0.45s ease',
               pointerEvents: 'none',
               zIndex: 5,
             }}

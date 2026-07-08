@@ -516,8 +516,10 @@ def _handle_mica_fit(inp: dict) -> dict:
         return {"shape": shape}
 
     except (FileNotFoundError, ImportError, ModuleNotFoundError) as exc:
-        logger.warning("MICA unavailable (%s) — returning neutral shape", exc)
-        return {"shape": [0.0] * 300}
+        # Report honestly instead of returning silent zeros — a COMPLETED job
+        # with a neutral shape hides broken weights behind a "quality bug".
+        logger.error("MICA unavailable: %s", exc)
+        return {"error": f"MICA unavailable on worker: {exc}"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

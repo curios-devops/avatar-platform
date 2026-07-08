@@ -42,6 +42,13 @@ _HEAD_FRACTION = 0.62
 # Minimum normal-z for a vertex to take colour from the frontal photo.
 _FRONT_FACING_MIN = 0.10
 
+# FLAME 5023-vertex layout: head 0..3930, then the two eyeball meshes.
+_EYEBALL_A = slice(3931, 4477)
+_EYEBALL_B = slice(4477, 5023)
+
+# Scalp/hair region starts this far above the eye line (metres).
+_HAIR_LINE_ABOVE_EYES = 0.05
+
 
 def _vertex_normals(verts: np.ndarray, faces: np.ndarray) -> np.ndarray:
     """Smooth per-vertex normals, (V, 3) float32."""
@@ -64,6 +71,75 @@ def _project_to_photo(verts: np.ndarray, photo_hw: tuple[int, int]) -> np.ndarra
     px = (verts[:, 0] - cx_v) * scale + w / 2
     py = (cy_v - verts[:, 1]) * scale + h / 2  # photo y grows downward
     return np.stack([px, py], axis=1).astype(np.float32)
+
+
+def project_flame_to_photo(verts: np.ndarray, photo_u8: np.ndarray) -> np.ndarray:
+    """
+    FLAME vertex → photo pixel mapping anchored on the *detected* eyes.
+
+    Similarity transform (scale + translation) that maps the FLAME eyeball
+    centres onto the mediapipe eye landmarks, so the scalp projects onto hair
+    and features line up. Falls back to the head-fraction heuristic when
+    landmarks are unavailable.
+    """
+    h, w = photo_u8.shape[:2]
+    lms = None
+    try:
+        from .mediapipe_utils import detect_face_landmarks
+        lms = detect_face_landmarks(photo_u8)
+    except Exception as exc:
+        logger.warning("texture_bake: mediapipe unavailable (%s)", exc)
+
+    if lms is None or len(lms) < 468:
+        logger.warning("texture_bake: no landmarks — head-fraction heuristic")
+        return _project_to_photo(verts, (h, w))
+
+    # Eye centres in photo pixels (mean of inner + outer corners per eye)
+    img_left_eye = np.array([(lms[33].x + lms[133].x) / 2 * w,
+                             (lms[33].y + lms[133].y) / 2 * h])
+    img_right_eye = np.array([(lms[362].x + lms[263].x) / 2 * w,
+                              (lms[362].y + lms[263].y) / 2 * h])
+    eye_dist_px = float(np.linalg.norm(img_left_eye - img_right_eye))
+
+    eye_a = verts[_EYEBALL_A].mean(axis=0)
+    eye_b = verts[_EYEBALL_B].mean(axis=0)
+    flame_dist = float(np.linalg.norm(eye_a[:2] - eye_b[:2]))
+
+    # Sanity: interocular ≈ 6.3 cm on FLAME, ≥ 20 px on a usable photo
+    if eye_dist_px < 20 or not (0.03 < flame_dist < 0.12):
+        logger.warning(
+            "texture_bake: implausible eye anchors (%.0fpx / %.3fm) — heuristic",
+            eye_dist_px, flame_dist,
+        )
+        return _project_to_photo(verts, (h, w))
+
+    scale = eye_dist_px / flame_dist
+    mid_px = (img_left_eye + img_right_eye) / 2
+    mid_v = (eye_a + eye_b) / 2
+    px = (verts[:, 0] - mid_v[0]) * scale + mid_px[0]
+    py = (mid_v[1] - verts[:, 1]) * scale + mid_px[1]  # photo y grows downward
+    return np.stack([px, py], axis=1).astype(np.float32)
+
+
+def backfill_hidden_colors(
+    verts: np.ndarray, colors: np.ndarray, front: np.ndarray
+) -> np.ndarray:
+    """
+    Give back-facing vertices the mean tone of their region — hair above the
+    eye line, skin below — so the back of the head is not painted skin-colour.
+    Mutates and returns ``colors``.
+    """
+    if not front.any():
+        return colors
+    global_mean = colors[front].mean(axis=0)
+    eye_y = (verts[_EYEBALL_A, 1].mean() + verts[_EYEBALL_B, 1].mean()) / 2
+    upper = verts[:, 1] > eye_y + _HAIR_LINE_ABOVE_EYES
+    for region in (upper, ~upper):
+        src = front & region
+        dst = ~front & region
+        if dst.any():
+            colors[dst] = colors[src].mean(axis=0) if src.any() else global_mean
+    return colors
 
 
 def _bilinear(img: np.ndarray, px: np.ndarray, py: np.ndarray) -> np.ndarray:
@@ -150,18 +226,16 @@ def bake_texture(
     verts = flame_template.apply_shape(tpl, shape)
 
     img = Image.open(io.BytesIO(aligned_image_bytes)).convert("RGB")
-    photo = np.asarray(img, dtype=np.float32) / 255.0
-    h, w = photo.shape[:2]
+    photo_u8 = np.asarray(img, dtype=np.uint8)
+    photo = photo_u8.astype(np.float32) / 255.0
 
-    pix = _project_to_photo(verts, (h, w))
+    pix = project_flame_to_photo(verts, photo_u8)
     colors = _bilinear(photo, pix[:, 0], pix[:, 1])  # (V, 3)
 
-    # Back-facing vertices → mean front-facing skin tone
+    # Back-facing vertices → mean tone of their region (hair / skin)
     normals = _vertex_normals(verts, tpl.faces)
     front = normals[:, 2] > _FRONT_FACING_MIN
-    if front.any():
-        skin = colors[front].mean(axis=0)
-        colors[~front] = skin
+    colors = backfill_hidden_colors(verts, colors, front)
 
     tex = _rasterize_uv(tpl.uv_coords, tpl.uv_faces, colors, size)
 
