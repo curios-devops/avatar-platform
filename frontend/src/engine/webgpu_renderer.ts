@@ -339,18 +339,22 @@ fn vs_main(
   let m_mask = 1.0 - smoothstep(0.030, 0.095, m_dist);
   // Chin follows fully, upper lip barely — a jaw opens downward only.
   let below  = clamp(0.5 - (center.y - mouth.y) * 12.0, 0.0, 1.0);
-  let drop   = u_speak.amplitude * 0.020 * m_mask * (0.25 + 0.75 * below);
+  let drop   = u_speak.amplitude * 0.024 * m_mask * (0.25 + 0.75 * below);
   center = vec3<f32>(center.x, center.y - drop, center.z - drop * 0.3);
 
-  // Blink: squash splats around each eye vertically toward the lid line —
-  // upper lid comes down, lower lid up. Eye centres in LAM canonical space.
+  // Blink: one tight mask PER eye (like the mouth), squashing splats toward
+  // the lid line. Outer radius must stay well under half the eye separation
+  // (6.6 cm) — a 4.2 cm mask merged across the nose bridge and dragged
+  // eyebrows/cheek with it, reading as a stretched band.
   if (u_speak.blink > 0.001) {
     let lid_y  = 0.032;
-    let eye_l  = vec3<f32>(-0.033, lid_y, 0.045);
-    let eye_r  = vec3<f32>( 0.033, lid_y, 0.045);
-    let e_dist = min(distance(center, eye_l), distance(center, eye_r));
-    let e_mask = (1.0 - smoothstep(0.016, 0.042, e_dist)) * u_speak.blink;
-    center = vec3<f32>(center.x, center.y - (center.y - lid_y) * 0.75 * e_mask, center.z);
+    let d_l = distance(center, vec3<f32>(-0.033, lid_y, 0.045));
+    let d_r = distance(center, vec3<f32>( 0.033, lid_y, 0.045));
+    let e_mask = max(
+      1.0 - smoothstep(0.010, 0.026, d_l),
+      1.0 - smoothstep(0.010, 0.026, d_r),
+    ) * u_speak.blink;
+    center = vec3<f32>(center.x, center.y - (center.y - lid_y) * 0.8 * e_mask, center.z);
   }
 
   var out: VOut;

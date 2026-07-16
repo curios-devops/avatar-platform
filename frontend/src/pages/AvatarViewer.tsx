@@ -16,6 +16,8 @@ const _dbgParam = (name: string) => {
 };
 const FORCED_AMP   = _dbgParam('amp');
 const FORCED_BLINK = _dbgParam('blink');
+// ?noidle=1 freezes the idle sway — clean A/B for mouth/blink tuning
+const NO_IDLE      = _dbgParam('noidle') === 1;
 
 // Average FFT magnitude of speech peaks around ~0.3 — map that towards 1
 // so the mouth displacement range is actually used while talking.
@@ -62,6 +64,10 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
   const [error, setError]               = useState<string | null>(null);
   const [fps, setFps]                   = useState(0);
   const [gaussianCount, setGaussianCount] = useState(0);
+  // Live speech amplitude, mirrored into the fps badge so "mouth not moving"
+  // is diagnosable at a glance: amp 0.00 = audio isn't reaching the shader.
+  const ampLiveRef = useRef(0);
+  const [ampUi, setAmpUi] = useState(0);
 
   // Speak panel state
   const [showSpeak, setShowSpeak]   = useState(false);
@@ -165,9 +171,11 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
             amp = Math.min(1, (sum / (ampDataRef.current.length * 128.0)) * AMP_GAIN);
           }
           if (FORCED_AMP !== null) amp = FORCED_AMP;
-          // Fast attack, slow release — raw per-frame FFT flutters at 60 fps
-          ampSmooth += (amp - ampSmooth) * (amp > ampSmooth ? 0.5 : 0.15);
+          // Fast attack, quick-ish release — articulates syllables without
+          // 60 fps flutter (0.15 release smeared syllable gaps together)
+          ampSmooth += (amp - ampSmooth) * (amp > ampSmooth ? 0.55 : 0.25);
           renderer.setAmplitude(ampSmooth);
+          ampLiveRef.current = ampSmooth;
 
           // Blink scheduler: closed→hold→open envelope at random intervals
           const nowMs = performance.now();
@@ -189,7 +197,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
           const t = (performance.now() - t0) / 1000;
           const view = camera.getViewMatrix();
           renderer.updateCamera(
-            mulMat4(view, idleModelMatrix(t, ampSmooth)),
+            NO_IDLE ? view : mulMat4(view, idleModelMatrix(t, ampSmooth)),
             camera.getProjectionMatrix(),
             view,
           );
@@ -198,6 +206,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
           const now = performance.now();
           if (now - fpsTimer >= 1000) {
             setFps(frames);
+            setAmpUi(ampLiveRef.current);
             frames = 0;
             fpsTimer = now;
           }
@@ -301,7 +310,10 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
         </div>
         <div style={css.badge}>
           {ready
-            ? <><span style={{ color: '#4ade80' }}>●</span> {fps} fps</>
+            ? <><span style={{ color: '#4ade80' }}>●</span> {fps} fps
+                <span style={{ color: ampUi > 0.02 ? '#a78bfa' : '#333' }}>
+                  &nbsp;amp {ampUi.toFixed(2)}
+                </span></>
             : <span style={{ color: '#555' }}>Loading…</span>}
         </div>
       </div>
