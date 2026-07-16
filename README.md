@@ -74,8 +74,9 @@ chmod +x scripts/setup_runpod.sh
 ./scripts/setup_runpod.sh
 ```
 
-Follow the instructions to deploy the worker to RunPod.
-### probar en dev: 4. Kill front y Back Y lanzar npm local 
+### Follow the instructions to deploy the worker to RunPod.
+### probar en dev: 
+### 4. Kill front y Back Y lanzar npm local 
 # reinicia npm run dev para que el backend tome el endpoint nuevo del .env
 kill $(lsof -ti tcp:8000) $(lsof -ti tcp:3000) 2>/dev/null
 cd /Users/mac/Documents/avatar-platform && npm run dev
