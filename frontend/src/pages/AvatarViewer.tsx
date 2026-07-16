@@ -3,7 +3,17 @@ import { WebGPURenderer } from '../engine/webgpu_renderer';
 import { SplatLoader } from '../engine/splat_loader';
 import { AnimationStream } from '../engine/animation_stream';
 import { Camera } from '../engine/camera';
+import { idleModelMatrix, mulMat4 } from '../engine/idle_motion';
 import QUICK_LINES from '../data/quick_lines.json';
+
+// Debug hook: ?amp=0.8 forces the speech amplitude (mouth + micro-nods)
+// so animation can be tuned visually without playing audio.
+const FORCED_AMP = (() => {
+  const v = new URLSearchParams(window.location.search).get('amp');
+  if (v === null) return null;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+})();
 
 interface AvatarViewerProps {
   avatarUrl: string;
@@ -130,19 +140,34 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
         setReady(true);
         setStage('');
 
+        const t0 = performance.now();
+        let ampSmooth = 0;
         const loop = () => {
           if (cancelled) return;
 
-          // Feed audio amplitude into jaw shader every frame
+          // Speech amplitude → mouth shader + micro-nods
+          let amp = 0;
           if (analyserRef.current && ampDataRef.current) {
             analyserRef.current.getByteFrequencyData(ampDataRef.current);
             let sum = 0;
             for (let i = 0; i < ampDataRef.current.length; i++) sum += ampDataRef.current[i];
-            const amp = sum / (ampDataRef.current.length * 128.0);
-            renderer.setAmplitude(amp);
+            amp = sum / (ampDataRef.current.length * 128.0);
           }
+          if (FORCED_AMP !== null) amp = FORCED_AMP;
+          // Fast attack, slow release — raw per-frame FFT flutters at 60 fps
+          ampSmooth += (amp - ampSmooth) * (amp > ampSmooth ? 0.5 : 0.15);
+          renderer.setAmplitude(ampSmooth);
 
-          renderer.updateCamera(camera.getViewMatrix(), camera.getProjectionMatrix());
+          // Idle sway runs always (speaking or mute); folded into the view
+          // matrix so shader covariance stays correct. Depth sort keeps the
+          // camera-only view (sway angles are too small to change the order).
+          const t = (performance.now() - t0) / 1000;
+          const view = camera.getViewMatrix();
+          renderer.updateCamera(
+            mulMat4(view, idleModelMatrix(t, ampSmooth)),
+            camera.getProjectionMatrix(),
+            view,
+          );
           renderer.render();
           frames++;
           const now = performance.now();

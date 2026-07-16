@@ -167,9 +167,12 @@ export class WebGPURenderer {
     console.log(`[renderer] Loaded ${this.gaussianCount} gaussians`);
   }
 
-  updateCamera(view: Float32Array, proj: Float32Array) {
-    // Store view for per-frame depth sort in render()
-    this._view.set(view);
+  updateCamera(view: Float32Array, proj: Float32Array, sortView?: Float32Array) {
+    // Store view for per-frame depth sort in render(). When the caller folds
+    // an idle model matrix into `view`, it passes the camera-only matrix as
+    // `sortView`: re-sorting 50 K splats every frame for a <4° sway buys
+    // nothing visually, and this keeps the "camera static → skip sort" fast path.
+    this._view.set(sortView ?? view);
 
     const d = new Float32Array(32);
     d.set(view, 0); d.set(proj, 16);
@@ -320,10 +323,17 @@ fn vs_main(
   var center = positions[si].xyz;
   let scale  = scales[si].xyz;
 
-  // Jaw animation: Gaussians below y=0 (lower face) shift down with amplitude
-  let jaw_factor = clamp(-center.y * 15.0, 0.0, 1.0);
-  let jaw_disp   = u_speak.amplitude * jaw_factor * 0.025;
-  center = vec3<f32>(center.x, center.y - jaw_disp, center.z + jaw_disp * 0.4);
+  // Speech motion: soft radial mask around the lips, so only the mouth area
+  // moves (the old version shifted everything below y=0 — the whole lower
+  // face stretched like a band). Mouth centre in LAM canonical space
+  // (head spans y ∈ [-0.22, 0.15], face at +z).
+  let mouth  = vec3<f32>(0.0, -0.06, 0.045);
+  let m_dist = distance(center, mouth);
+  let m_mask = 1.0 - smoothstep(0.030, 0.095, m_dist);
+  // Chin follows fully, upper lip barely — a jaw opens downward only.
+  let below  = clamp(0.5 - (center.y - mouth.y) * 12.0, 0.0, 1.0);
+  let drop   = u_speak.amplitude * 0.016 * m_mask * (0.25 + 0.75 * below);
+  center = vec3<f32>(center.x, center.y - drop, center.z - drop * 0.3);
 
   var out: VOut;
   let cam_pos = camera.view * vec4<f32>(center, 1.0);
