@@ -6,14 +6,24 @@ import { Camera } from '../engine/camera';
 import { idleModelMatrix, mulMat4 } from '../engine/idle_motion';
 import QUICK_LINES from '../data/quick_lines.json';
 
-// Debug hook: ?amp=0.8 forces the speech amplitude (mouth + micro-nods)
-// so animation can be tuned visually without playing audio.
-const FORCED_AMP = (() => {
-  const v = new URLSearchParams(window.location.search).get('amp');
+// Debug hooks: ?amp=0.8 forces the speech amplitude (mouth + micro-nods),
+// ?blink=1 forces the blink phase — animation tuning without playing audio.
+const _dbgParam = (name: string) => {
+  const v = new URLSearchParams(window.location.search).get(name);
   if (v === null) return null;
   const n = parseFloat(v);
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
-})();
+};
+const FORCED_AMP   = _dbgParam('amp');
+const FORCED_BLINK = _dbgParam('blink');
+
+// Average FFT magnitude of speech peaks around ~0.3 — map that towards 1
+// so the mouth displacement range is actually used while talking.
+const AMP_GAIN = 2.4;
+
+// Blink timing (ms): fast close, brief hold, slower open — like a real blink
+const BLINK_CLOSE = 70, BLINK_HOLD = 40, BLINK_OPEN = 110;
+const nextBlinkDelay = () => 2000 + Math.random() * 4000;
 
 interface AvatarViewerProps {
   avatarUrl: string;
@@ -142,6 +152,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
 
         const t0 = performance.now();
         let ampSmooth = 0;
+        let blinkAt = t0 + 1200 + Math.random() * 2000;
         const loop = () => {
           if (cancelled) return;
 
@@ -151,12 +162,26 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
             analyserRef.current.getByteFrequencyData(ampDataRef.current);
             let sum = 0;
             for (let i = 0; i < ampDataRef.current.length; i++) sum += ampDataRef.current[i];
-            amp = sum / (ampDataRef.current.length * 128.0);
+            amp = Math.min(1, (sum / (ampDataRef.current.length * 128.0)) * AMP_GAIN);
           }
           if (FORCED_AMP !== null) amp = FORCED_AMP;
           // Fast attack, slow release — raw per-frame FFT flutters at 60 fps
           ampSmooth += (amp - ampSmooth) * (amp > ampSmooth ? 0.5 : 0.15);
           renderer.setAmplitude(ampSmooth);
+
+          // Blink scheduler: closed→hold→open envelope at random intervals
+          const nowMs = performance.now();
+          let blink = 0;
+          const bt = nowMs - blinkAt;
+          if (bt >= 0) {
+            if (bt < BLINK_CLOSE)                    blink = bt / BLINK_CLOSE;
+            else if (bt < BLINK_CLOSE + BLINK_HOLD)  blink = 1;
+            else if (bt < BLINK_CLOSE + BLINK_HOLD + BLINK_OPEN)
+              blink = 1 - (bt - BLINK_CLOSE - BLINK_HOLD) / BLINK_OPEN;
+            else blinkAt = nowMs + nextBlinkDelay();
+          }
+          if (FORCED_BLINK !== null) blink = FORCED_BLINK;
+          renderer.setBlink(blink);
 
           // Idle sway runs always (speaking or mute); folded into the view
           // matrix so shader covariance stays correct. Depth sort keeps the

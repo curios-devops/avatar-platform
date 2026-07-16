@@ -185,6 +185,12 @@ export class WebGPURenderer {
   }
   private _amplitude = 0;
 
+  /** Blink phase [0 = open, 1 = closed]. Call every RAF frame. */
+  setBlink(v: number) {
+    this._blink = Math.max(0, Math.min(1, v));
+  }
+  private _blink = 0;
+
   updateDeformation(positions?: Float32Array) {
     if (positions) this.device.queue.writeBuffer(this.positionBuffer, 0, positions);
   }
@@ -201,7 +207,7 @@ export class WebGPURenderer {
     // amplitude + viewport size (shader needs pixels for covariance focal)
     this.device.queue.writeBuffer(
       this.speakBuffer, 0,
-      new Float32Array([this._amplitude, this.canvas.width, this.canvas.height, 0]),
+      new Float32Array([this._amplitude, this.canvas.width, this.canvas.height, this._blink]),
     );
 
     const enc  = this.device.createCommandEncoder();
@@ -286,8 +292,9 @@ struct Camera {
   projection: mat4x4<f32>,
 }
 
-// u_speak: x = jaw amplitude [0,1], y/z = viewport width/height in pixels
-struct Speak { amplitude: f32, vp_w: f32, vp_h: f32, _p2: f32 }
+// u_speak: x = jaw amplitude [0,1], y/z = viewport width/height in pixels,
+// w = blink phase [0 = eyes open, 1 = closed]
+struct Speak { amplitude: f32, vp_w: f32, vp_h: f32, blink: f32 }
 
 @group(0) @binding(0) var<uniform>       camera:         Camera;
 @group(0) @binding(1) var<storage, read> positions:      array<vec4<f32>>;
@@ -332,8 +339,19 @@ fn vs_main(
   let m_mask = 1.0 - smoothstep(0.030, 0.095, m_dist);
   // Chin follows fully, upper lip barely — a jaw opens downward only.
   let below  = clamp(0.5 - (center.y - mouth.y) * 12.0, 0.0, 1.0);
-  let drop   = u_speak.amplitude * 0.016 * m_mask * (0.25 + 0.75 * below);
+  let drop   = u_speak.amplitude * 0.020 * m_mask * (0.25 + 0.75 * below);
   center = vec3<f32>(center.x, center.y - drop, center.z - drop * 0.3);
+
+  // Blink: squash splats around each eye vertically toward the lid line —
+  // upper lid comes down, lower lid up. Eye centres in LAM canonical space.
+  if (u_speak.blink > 0.001) {
+    let lid_y  = 0.032;
+    let eye_l  = vec3<f32>(-0.033, lid_y, 0.045);
+    let eye_r  = vec3<f32>( 0.033, lid_y, 0.045);
+    let e_dist = min(distance(center, eye_l), distance(center, eye_r));
+    let e_mask = (1.0 - smoothstep(0.016, 0.042, e_dist)) * u_speak.blink;
+    center = vec3<f32>(center.x, center.y - (center.y - lid_y) * 0.75 * e_mask, center.z);
+  }
 
   var out: VOut;
   let cam_pos = camera.view * vec4<f32>(center, 1.0);
