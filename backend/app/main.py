@@ -20,6 +20,30 @@ app.include_router(animate.router, prefix=settings.API_V1_PREFIX)
 app.include_router(stream.router, prefix=settings.API_V1_PREFIX)
 app.include_router(speak.router, prefix=settings.API_V1_PREFIX)
 
+@app.on_event("startup")
+async def _sync_lam_idle_timeout() -> None:
+    """Push LAM_IDLE_TIMEOUT_S from .env to the RunPod endpoint (best-effort),
+    so the warm-window knob lives in config instead of the RunPod console."""
+    if not (settings.RUNPOD_LAM_ENDPOINT_ID and settings.RUNPOD_API_KEY):
+        return
+    import logging
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.patch(
+                f"https://rest.runpod.io/v1/endpoints/{settings.RUNPOD_LAM_ENDPOINT_ID}",
+                json={"idleTimeout": settings.LAM_IDLE_TIMEOUT_S},
+                headers={"Authorization": f"Bearer {settings.RUNPOD_API_KEY}"},
+            )
+            r.raise_for_status()
+        logging.getLogger(__name__).info(
+            "LAM endpoint idleTimeout synced to %ss", settings.LAM_IDLE_TIMEOUT_S
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning("LAM idleTimeout sync failed: %s", exc)
+
+
 # Dev-only: serve local artifact files at /dev-storage/
 if settings.DEV_STORAGE:
     import pathlib

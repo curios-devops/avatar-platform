@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     RUNPOD_MICA_ENDPOINT_ID: Optional[str] = None           # MICA multi-view identity (legacy)
     RUNPOD_LAM_ENDPOINT_ID: Optional[str] = None            # LAM one-shot gaussian head
     RUNPOD_EMOCA_ENDPOINT_ID: Optional[str] = None          # EMOCA detailed mesh + albedo
+    # Seconds a LAM worker stays warm (billed) after its last job. Synced to
+    # the RunPod endpoint at backend startup — .env is the source of truth.
+    LAM_IDLE_TIMEOUT_S: int = 300
 
     MOCK_PIPELINE: bool = False
 

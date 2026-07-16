@@ -85,3 +85,58 @@ Multiview (Nano Banana via Vertex express), MICA client hardening, texture
 bake and camera/shader fixes all remain functional as the fallback pipeline.
 Nano Banana stays for the "Imagine" tab. The MICA worker image on RunPod is
 still broken (returns neutral shapes) — not worth fixing if LAM lands.
+
+## Inference optimization + CUDA-host incident (2026-07-14)
+
+**Result: warm reconstruct 116 s → 28.4 s** (worker `mode=resident`), warmup
+no-op 147 ms, one-time resident model load 20.2 s per container. PLY output
+byte-class identical (1329 KB, 20k gaussians) and visually verified against
+the reference viewer.
+
+What changed (image `devopsavatar/lam-worker:v7`, built incrementally on v5
+via `docker/lam_worker.incremental.Dockerfile` — no HF re-download, weights
+copied from the known-good layers):
+- **Resident model, lazy-loaded**: `LAMInferrer` is built once per container
+  on the FIRST job (never at import — loading before
+  `runpod.serverless.start()` keeps the worker stuck in "initializing"
+  forever; observed live). Warmup jobs trigger/absorb the load.
+- **1-frame motion sequence** (`assets/sample_motion/export/neutral_1f`):
+  LAM renders every motion frame inside its forward pass; the sequence
+  length, not reconstruction, dominated job time. We only need the canonical
+  PLY.
+- Subprocess mode kept as automatic fallback (`mode` field in the response
+  tells which path ran).
+
+**Incident (full evening lost to it): jobs stuck IN_QUEUE with "ready" workers.**
+Root cause: RunPod hosts running **CUDA 13.x drivers** cannot run our
+CUDA 12.1 image — container boots, torch CUDA init fails
+(`Fitness check failed: _cuda_init_check … no kernel image is available`),
+worker shows "ready" but never polls the queue. With every 24 GB pool at
+stock "Low" the scheduler kept assigning exactly those hosts (FlashBoot makes
+it sticky: it prefers hosts that already cached the image — including broken
+ones). Discriminators that cracked it: fresh endpoint + public hello-world
+image (no CUDA) → jobs flow; same endpoint + any of our images → silent.
+
+**Fix: `allowedCudaVersions: ["12.1"…"12.6"]` on the endpoint** — first
+warmup completed 3 minutes later.
+
+Ops learnings (all bitten live):
+- Changing a template's image does NOT recycle existing workers — bounce
+  `workersMax` 0→N afterwards, with a verification read (the two PATCHes can
+  race and leave the endpoint paused at max=0).
+- Endpoint config drift: the backend now syncs `LAM_IDLE_TIMEOUT_S` from
+  `.env` at startup (source of truth in repo, not the console).
+- Worker quota is account-wide (10); creating endpoints fails with 500 until
+  freed.
+- Current endpoint: `avatar-lam-v4` (`x1hmke8mv6xouc`), template
+  `9usabmb0fq` → `lam-worker:v7`, idleTimeout 300 s, FlashBoot on,
+  min 0 / max 2, dataCenterIds global, CUDA 12.1–12.6.
+- Region note (2026-07-14): users will be in the US, but with global stock
+  "Low" restricting `dataCenterIds` would only shrink the pool; latency is
+  irrelevant vs queue time for 30 s jobs. Revisit US pinning when stock
+  normalizes.
+
+Next optimization candidates: the remaining ~28 s is dominated by LAM's
+per-image flame tracking/preprocessing, not the forward pass (~1.4 s per the
+paper); and `docker login` is needed before the next image push (auth
+expired — v8 with a newer runpod SDK was built locally but never needed).
