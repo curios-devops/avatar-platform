@@ -93,6 +93,7 @@ async def run_avatar_pipeline(
     job_id: str,
     photo_url: str,
     _progress_offset: float = 0.0,
+    tier: str = "head",
 ) -> None:
     """
     Full photo → FLAME-rigged avatar pipeline (MVP).
@@ -141,6 +142,49 @@ async def run_avatar_pipeline(
         from ..services.gemini_image import enhance_photo
         image_bytes = await enhance_photo(image_bytes)
 
+        # ── 2c. Body tiers (half/full) → LHM worker ────────────────────────────
+        # No face-crop preprocess: LHM needs the body framing intact. No legacy
+        # fallback either — the MICA path is head-only, so errors stay honest.
+        if tier in ("half", "full"):
+            if not settings.RUNPOD_LHM_ENDPOINT_ID:
+                queue_service.update_job_status(
+                    job_id, "failed",
+                    error="Body avatars unavailable: RUNPOD_LHM_ENDPOINT_ID unset",
+                )
+                return
+            _stage(job_id, _p(0.30), "lhm_reconstruct")
+            from ..pipeline.runpod_lhm import RunPodLHMClient
+            lhm = RunPodLHMClient(
+                settings.RUNPOD_LHM_ENDPOINT_ID, settings.RUNPOD_API_KEY
+            )
+            ply_bytes = await lhm.reconstruct(image_bytes)
+
+            _stage(job_id, _p(0.85), "publish")
+            gauss_url = storage_service.upload_fileobj(
+                io.BytesIO(ply_bytes), f"avatars/{job_id}/gaussians.ply"
+            )
+            from PIL import Image
+            buf = io.BytesIO()
+            img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            img.thumbnail((512, 512))
+            img.save(buf, format="PNG")
+            buf.seek(0)
+            preview_url = storage_service.upload_fileobj(
+                buf, f"avatars/{job_id}/neutral_front.png"
+            )
+            queue_service.update_job_status(
+                job_id, "done", progress=1.0,
+                result={
+                    "gaussians": gauss_url,
+                    "preview": preview_url,
+                    "pipeline": "lhm",
+                    "tier": tier,
+                },
+            )
+            logger.info("job=%s done via LHM (%s) — %d KB ply",
+                        job_id, tier, len(ply_bytes) // 1024)
+            return
+
         # ── 3. Preprocess ─────────────────────────────────────────────────────
         _stage(job_id, _p(0.20), "preprocess")
         aligned_bytes = preprocess(image_bytes, result.face_bbox)
@@ -176,6 +220,7 @@ async def run_avatar_pipeline(
                         "gaussians": gauss_url,
                         "preview": preview_url,
                         "pipeline": "lam",
+                        "tier": "head",
                     },
                 )
                 logger.info("job=%s done via LAM — %d KB ply", job_id, len(ply_bytes) // 1024)

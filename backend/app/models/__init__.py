@@ -10,6 +10,8 @@ class CreateAvatarRequest(BaseModel):
 
 class ProcessPhotoRequest(BaseModel):
     photo_url: str  # URL returned by POST /avatar/upload or any accessible photo URL
+    # Avatar tier: "head" → LAM gaussian head, "half"/"full" → LHM body avatar
+    tier: str = "head"
 
 
 class GenerateAvatarRequest(BaseModel):

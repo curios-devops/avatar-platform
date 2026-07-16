@@ -15,10 +15,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# speak first: its literal routes (/avatar/voices) must win over
+# avatar.py's catch-all GET /avatar/{avatar_id} (FastAPI matches in order)
+app.include_router(speak.router, prefix=settings.API_V1_PREFIX)
 app.include_router(avatar.router, prefix=settings.API_V1_PREFIX)
 app.include_router(animate.router, prefix=settings.API_V1_PREFIX)
 app.include_router(stream.router, prefix=settings.API_V1_PREFIX)
-app.include_router(speak.router, prefix=settings.API_V1_PREFIX)
 
 @app.on_event("startup")
 async def _sync_lam_idle_timeout() -> None:

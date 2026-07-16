@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     # Nano Banana 2 Lite; override via env to swap models without a deploy
     GEMINI_IMAGE_MODEL: str = "gemini-3.1-flash-lite-image"
+    # Vision model — photo intake analysis (framing head/half/full).
+    # 2.5-flash chosen over 3.1-flash-lite: the lite model misclassifies
+    # head-and-shoulders portraits as "half" (tested 2026-07-17).
+    GEMINI_VISION_MODEL: str = "gemini-2.5-flash"
 
     @property
     def gemini_enabled(self) -> bool:

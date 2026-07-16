@@ -8,19 +8,32 @@ interface UploadProps {
 
 // ── constants ──────────────────────────────────────────────────────────────────
 const STEP_LABELS: Record<string, string> = {
-  downloading: 'Getting ready…',
-  ingest:      'Checking your photo…',
-  preprocess:  'Polishing the image…',
-  multiview:   'Generating multiple views…',
-  flame_fit:   'Mapping your face…',
-  reconstruct: 'Sculpting your 3D avatar…',
-  rig:         'Rigging the skeleton…',
-  package:     'Packing the bundle…',
-  publish:     'Almost there…',
-  generating:  'Imagining your character…',
+  downloading:     'Getting ready…',
+  ingest:          'Checking your photo…',
+  preprocess:      'Polishing the image…',
+  lam_reconstruct: 'Sculpting your 3D head on the GPU…',
+  lhm_reconstruct: 'Sculpting your 3D body on the GPU…',
+  multiview:       'Generating multiple views…',
+  flame_fit:       'Mapping your face…',
+  reconstruct:     'Sculpting your 3D avatar…',
+  rig:             'Rigging the skeleton…',
+  package:         'Packing the bundle…',
+  publish:         'Almost there…',
+  generating:      'Imagining your character…',
 };
 
-const PIPELINE_STEPS = [
+// GPU one-shot flow (LAM head / LHM body) — the default since 2026-07.
+const gpuSteps = (reconstructKey: string) => [
+  { key: 'downloading',   icon: '⬇️', label: 'Download' },
+  { key: 'ingest',        icon: '🔍', label: 'Check' },
+  { key: 'preprocess',    icon: '✨', label: 'Polish' },
+  { key: reconstructKey,  icon: '🧊', label: '3D sculpt' },
+  { key: 'publish',       icon: '🚀', label: 'Publish' },
+];
+
+// Legacy multiview/MICA fallback — only shown if the backend actually
+// enters one of its stages (LAM failure fallback).
+const LEGACY_STEPS = [
   { key: 'downloading', icon: '⬇️', label: 'Download' },
   { key: 'ingest',      icon: '🔍', label: 'Check' },
   { key: 'preprocess',  icon: '✨', label: 'Polish' },
@@ -31,6 +44,20 @@ const PIPELINE_STEPS = [
   { key: 'package',     icon: '📦', label: 'Pack' },
   { key: 'publish',     icon: '🚀', label: 'Publish' },
 ];
+const LEGACY_ONLY = new Set(['multiview', 'flame_fit', 'reconstruct', 'rig', 'package']);
+
+type Framing = 'head' | 'half' | 'full';
+const FRAMING_META: Record<Framing, { label: string; emoji: string }> = {
+  head: { label: 'Cabeza',         emoji: '🙂' },
+  half: { label: 'Medio cuerpo',   emoji: '🧍‍♂️' },
+  full: { label: 'Cuerpo completo', emoji: '🕴️' },
+};
+interface PhotoAnalysis {
+  framing: Framing;
+  quality_ok: boolean;
+  issues: string[];
+  tiers_available: Record<Framing, boolean>;
+}
 
 const CHARACTER_PRESETS = [
   { label: 'Talking Monkey',  emoji: '🐒' },
@@ -68,6 +95,14 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
   const [photoFile, setPhotoFile]   = useState<File | null>(null);
   const [photoLocal, setPhotoLocal] = useState<string | null>(null);
   const [camActive, setCamActive]   = useState(false);
+
+  // photo intake analysis (framing + quality) and tier selection
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [analysis, setAnalysis]       = useState<PhotoAnalysis | null>(null);
+  const [analyzing, setAnalyzing]     = useState(false);
+  const [tier, setTier]               = useState<Framing>('head');
+  const [reframing, setReframing]     = useState(false);
+  const [reframeError, setReframeError] = useState<string | null>(null);
   const camStreamRef = useRef<MediaStream | null>(null);
   const camVideoRef  = useRef<HTMLVideoElement>(null);
   const camCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -138,10 +173,66 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
     c.getContext('2d')!.drawImage(v, 0, 0);
     c.toBlob(blob => {
       if (!blob) return;
-      setPhotoFile(new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
-      setPhotoLocal(URL.createObjectURL(blob));
+      onPhotoChosen(new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
       stopPhotoCamera();
     }, 'image/jpeg', 0.95);
+  };
+
+  // ── photo intake: upload right away + Gemini framing/quality analysis ────────
+  const uploadAndAnalyze = async (file: File) => {
+    setAnalyzing(true); setAnalysis(null); setUploadedUrl(null); setReframeError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const up = await fetch(`${serverUrl}/api/v1/avatar/upload`, { method: 'POST', body: form });
+      if (!up.ok) throw new Error('upload failed');
+      const { video_url } = await up.json();
+      setUploadedUrl(video_url);
+
+      const an = await fetch(`${serverUrl}/api/v1/avatar/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_url: video_url }),
+      });
+      if (an.ok) {
+        const a: PhotoAnalysis = await an.json();
+        setAnalysis(a);
+        setTier(a.tiers_available[a.framing] ? a.framing : 'head');
+      }
+    } catch {
+      // Analysis is best-effort — Generate still works without it.
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const onPhotoChosen = (file: File) => {
+    setPhotoFile(file);
+    setPhotoLocal(URL.createObjectURL(file));
+    uploadAndAnalyze(file);
+  };
+
+  // Nano Banana: convert the photo to the target framing, preview the result
+  const reframeTo = async (target: Framing) => {
+    if (!uploadedUrl) return;
+    setReframing(true); setReframeError(null);
+    try {
+      const r = await fetch(`${serverUrl}/api/v1/avatar/reframe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_url: uploadedUrl, target }),
+      });
+      if (!r.ok) throw new Error('reframe failed');
+      const { photo_url } = await r.json();
+      setUploadedUrl(photo_url);
+      setPhotoLocal(photo_url);
+      setAnalysis(a => (a ? { ...a, framing: target, quality_ok: true, issues: [] } : a));
+      setTier(target);
+    } catch {
+      setReframeError('No se pudo convertir la foto — prueba otra vez.');
+    } finally {
+      setReframing(false);
+    }
   };
 
   // ── voice ─────────────────────────────────────────────────────────────────────
@@ -227,17 +318,22 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
         return;
       }
 
-      const file = tab === 'photo' ? photoFile : videoFile;
-      const form = new FormData();
-      form.append('file', file!);
-      const upResp = await fetch(`${serverUrl}/api/v1/avatar/upload`, { method: 'POST', body: form });
-      if (!upResp.ok) throw new Error('Upload failed');
-      const { video_url } = await upResp.json();
+      // Photo tab uploads at selection time (for the analysis step) — reuse it
+      let uploaded = tab === 'photo' ? uploadedUrl : null;
+      if (!uploaded) {
+        const file = tab === 'photo' ? photoFile : videoFile;
+        const form = new FormData();
+        form.append('file', file!);
+        const upResp = await fetch(`${serverUrl}/api/v1/avatar/upload`, { method: 'POST', body: form });
+        if (!upResp.ok) throw new Error('Upload failed');
+        const { video_url } = await upResp.json();
+        uploaded = video_url;
+      }
 
       const endpoint = tab === 'photo' ? '/api/v1/avatar/process' : '/api/v1/avatar/create';
       const body = tab === 'photo'
-        ? JSON.stringify({ photo_url: video_url })
-        : JSON.stringify({ video_url, mode: 'head' });
+        ? JSON.stringify({ photo_url: uploaded, tier })
+        : JSON.stringify({ video_url: uploaded, mode: 'head' });
 
       const r = await fetch(`${serverUrl}${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
@@ -284,6 +380,8 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
   const reset = () => {
     setStatus('idle'); setProgress(0); setCurrentStage('');
     setPhotoFile(null); setPhotoLocal(null);
+    setUploadedUrl(null); setAnalysis(null); setAnalyzing(false);
+    setTier('head'); setReframing(false); setReframeError(null);
     setAudioLocal(null);
     setVideoFile(null); setVideoLocal(null);
     setPreviewUrl(null); setGaussiansUrl(null);
@@ -300,11 +398,17 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
   };
 
   const canBuild =
-    (tab === 'photo'   && !!photoFile) ||
+    (tab === 'photo'   && !!photoFile && !reframing && !analyzing) ||
     (tab === 'video'   && !!videoFile) ||
     (tab === 'imagine' && !!(preset || customDesc.trim()));
 
-  const stepIndex = PIPELINE_STEPS.findIndex(s => s.key === currentStage);
+  // Step pills follow the flow the backend is actually running: the GPU
+  // one-shot path by default, the legacy multiview list only if a legacy
+  // stage is ever reported (LAM-failure fallback).
+  const pipelineSteps = LEGACY_ONLY.has(currentStage)
+    ? LEGACY_STEPS
+    : gpuSteps(currentStage === 'lhm_reconstruct' ? 'lhm_reconstruct' : 'lam_reconstruct');
+  const stepIndex = pipelineSteps.findIndex(s => s.key === currentStage);
 
   // ── READY SCREEN ─────────────────────────────────────────────────────────────
   if (status === 'ready') {
@@ -404,7 +508,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
 
           {/* step pills */}
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {PIPELINE_STEPS.map((s, i) => {
+            {pipelineSteps.map((s, i) => {
               const done    = i < stepIndex;
               const current = i === stepIndex;
               return (
@@ -498,12 +602,87 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                   icon="🖼️"
                   hint="Tap to choose a photo  or  drag & drop"
                   accept="image/*"
-                  onChange={f => { setPhotoFile(f); setPhotoLocal(URL.createObjectURL(f)); }}
+                  onChange={onPhotoChosen}
                 />
                 <button style={P.ghostBtn} onClick={startPhotoCamera}>
                   📷 Use camera instead
                 </button>
               </>
+            )}
+
+            {/* ── intake analysis + avatar tier ─────────────────────────── */}
+            {photoLocal && (analyzing || analysis) && (
+              <div style={{
+                border: '1px solid rgba(167,139,250,0.25)', borderRadius: 12,
+                padding: '12px 14px', background: 'rgba(124,58,237,0.06)',
+                display: 'flex', flexDirection: 'column', gap: 10,
+              }}>
+                {analyzing ? (
+                  <span style={{ fontSize: 13, color: '#a78bfa' }}>
+                    🔎 Analizando tu foto…
+                  </span>
+                ) : analysis && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: '#cbd5e1' }}>
+                        {FRAMING_META[analysis.framing].emoji} Detectado:&nbsp;
+                        <b>{FRAMING_META[analysis.framing].label}</b>
+                      </span>
+                      {analysis.quality_ok
+                        ? <span style={{ fontSize: 12, color: '#4ade80' }}>✓ foto válida</span>
+                        : <span style={{ fontSize: 12, color: '#fbbf24' }}>
+                            ⚠️ {analysis.issues.join(' · ') || 'revisa la foto'}
+                          </span>}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {(Object.keys(FRAMING_META) as Framing[]).map(t => {
+                        const available = analysis.tiers_available[t];
+                        const selected = tier === t;
+                        return (
+                          <button key={t} disabled={!available || reframing}
+                            onClick={() => setTier(t)}
+                            title={available ? '' : 'Disponible próximamente'}
+                            style={{
+                              flex: 1, padding: '8px 6px', borderRadius: 9,
+                              fontSize: 12, fontFamily: 'inherit',
+                              cursor: available ? 'pointer' : 'not-allowed',
+                              opacity: available ? 1 : 0.35,
+                              background: selected ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${selected ? 'rgba(167,139,250,0.7)' : '#1e1e2e'}`,
+                              color: selected ? '#e9d5ff' : '#9ca3af',
+                            }}>
+                            {FRAMING_META[t].emoji} {FRAMING_META[t].label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {tier !== analysis.framing && analysis.tiers_available[tier] && (
+                      <button onClick={() => reframeTo(tier)} disabled={reframing}
+                        style={{
+                          padding: '9px 12px', borderRadius: 9, fontSize: 13,
+                          fontFamily: 'inherit', cursor: reframing ? 'wait' : 'pointer',
+                          background: 'linear-gradient(135deg,rgba(124,58,237,0.35),rgba(79,70,229,0.35))',
+                          border: '1px solid rgba(167,139,250,0.5)', color: '#e9d5ff',
+                        }}>
+                        {reframing
+                          ? '🎨 Convirtiendo la foto con IA…'
+                          : `🎨 Convertir foto a ${FRAMING_META[tier].label.toLowerCase()} con IA`}
+                      </button>
+                    )}
+                    {tier !== analysis.framing && analysis.tiers_available[tier] && !reframing && (
+                      <span style={{ fontSize: 11, color: '#64748b' }}>
+                        La foto es «{FRAMING_META[analysis.framing].label.toLowerCase()}» — conviértela
+                        primero para un mejor resultado, o genera tal cual.
+                      </span>
+                    )}
+                    {reframeError && (
+                      <span style={{ fontSize: 12, color: '#fca5a5' }}>⚠️ {reframeError}</span>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
             <Divider />

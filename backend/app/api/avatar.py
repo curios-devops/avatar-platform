@@ -1,9 +1,14 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
+from pydantic import BaseModel
 from typing import Optional
+import io
 import time
 import uuid
 from datetime import datetime
 
+import httpx
+
+from ..config import settings
 from ..models import CreateAvatarRequest, ProcessPhotoRequest, GenerateAvatarRequest, Avatar, JobStatus
 from ..services.queue import queue_service
 from ..services.storage import storage_service
@@ -115,7 +120,8 @@ async def process_photo(
     background_tasks: BackgroundTasks,
 ):
     """
-    Start the photo → FLAME-rigged Gaussian head pipeline.
+    Start the photo → gaussian avatar pipeline for the requested tier:
+    "head" (LAM), "half" or "full" (LHM body worker).
 
     Accepts a photo_url from the /avatar/upload endpoint (or any accessible URL).
     Returns job_id immediately; pipeline runs in the background.
@@ -123,9 +129,86 @@ async def process_photo(
     Poll GET /avatar/job/{job_id}/status for progress.
     When status == "done", result contains the full AvatarBundle including preview_url.
     """
-    job_id = queue_service.submit_job("avatar_pipeline", {"photo_url": request.photo_url})
-    background_tasks.add_task(run_avatar_pipeline, job_id, request.photo_url)
+    if request.tier not in ("head", "half", "full"):
+        raise HTTPException(status_code=422, detail=f"invalid tier: {request.tier}")
+    if request.tier != "head" and not settings.RUNPOD_LHM_ENDPOINT_ID:
+        raise HTTPException(
+            status_code=503,
+            detail="Body avatars not available yet (RUNPOD_LHM_ENDPOINT_ID unset)",
+        )
+    job_id = queue_service.submit_job(
+        "avatar_pipeline", {"photo_url": request.photo_url, "tier": request.tier}
+    )
+    background_tasks.add_task(
+        run_avatar_pipeline, job_id, request.photo_url, tier=request.tier
+    )
     return JobStatus(id=job_id, status="processing", progress=0.0)
+
+
+class AnalyzePhotoRequest(BaseModel):
+    photo_url: str
+
+
+class ReframePhotoRequest(BaseModel):
+    photo_url: str
+    target: str  # head | half | full
+
+
+@router.post("/analyze")
+async def analyze_photo_endpoint(request: AnalyzePhotoRequest):
+    """
+    Gemini-vision intake check for an uploaded photo: detected framing
+    (head / half / full), quality flags, and which tiers this deployment
+    can generate. The UI uses it to offer "generate as-is" vs "convert".
+    """
+    from ..services.photo_analysis import analyze_photo
+
+    if not settings.gemini_enabled:
+        raise HTTPException(status_code=503, detail="Gemini not configured")
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(request.photo_url)
+            resp.raise_for_status()
+        analysis = await analyze_photo(resp.content)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"analysis failed: {exc}") from exc
+
+    analysis["tiers_available"] = {
+        "head": bool(settings.RUNPOD_LAM_ENDPOINT_ID) or settings.MOCK_PIPELINE,
+        "half": bool(settings.RUNPOD_LHM_ENDPOINT_ID),
+        "full": bool(settings.RUNPOD_LHM_ENDPOINT_ID),
+    }
+    return analysis
+
+
+@router.post("/reframe")
+async def reframe_photo_endpoint(request: ReframePhotoRequest):
+    """
+    Nano Banana edit: convert the uploaded photo to the target framing
+    (head / half / full) preserving identity. Returns the new photo_url,
+    ready for /avatar/process with the matching tier.
+    """
+    from ..services.photo_analysis import reframe_photo
+
+    if not settings.gemini_enabled:
+        raise HTTPException(status_code=503, detail="Gemini not configured")
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(request.photo_url)
+            resp.raise_for_status()
+        jpeg = await reframe_photo(resp.content, request.target)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"reframe failed: {exc}") from exc
+
+    key = f"uploads/reframed/{uuid.uuid4()}_{request.target}.jpg"
+    url = storage_service.upload_fileobj(io.BytesIO(jpeg), key)
+    return {"photo_url": url, "target": request.target}
 
 
 @router.get("/job/{job_id}/preview")
