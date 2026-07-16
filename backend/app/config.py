@@ -57,7 +57,8 @@ class Settings(BaseSettings):
     RUNPOD_RECONSTRUCT_ENDPOINT_ID: Optional[str] = None    # Gaussian reconstruct (current)
     # Phase 2 — MICA identity + EMOCA detailed face reconstruction
     RUNPOD_MICA_ENDPOINT_ID: Optional[str] = None           # MICA multi-view identity (legacy)
-    RUNPOD_LAM_ENDPOINT_ID: Optional[str] = None            # LAM one-shot gaussian head
+    RUNPOD_LAM_ENDPOINT_ID: Optional[str] = None            # LAM one-shot gaussian head (tier 1)
+    RUNPOD_LHM_ENDPOINT_ID: Optional[str] = None            # LHM half/full-body gaussian (tiers 2-3)
     RUNPOD_EMOCA_ENDPOINT_ID: Optional[str] = None          # EMOCA detailed mesh + albedo
     # Seconds a LAM worker stays warm (billed) after its last job. Synced to
     # the RunPod endpoint at backend startup — .env is the source of truth.

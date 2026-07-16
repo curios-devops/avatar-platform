@@ -140,3 +140,35 @@ Next optimization candidates: the remaining ~28 s is dominated by LAM's
 per-image flame tracking/preprocessing, not the forward pass (~1.4 s per the
 paper); and `docker login` is needed before the next image push (auth
 expired — v8 with a newer runpod SDK was built locally but never needed).
+
+## 2026-07-17 — cu126 rebuild deferred; LHM worker POC (avatar tiers 2-3)
+
+**cu126 rebuild deferred, with reasoning:** cu121 images are the most widely
+deployed on RunPod — if CUDA-13-driver hosts broke them all, the platform
+would be on fire. Those hosts are simply misconfigured, and a cu126 image
+doesn't make broken hosts work. `allowedCudaVersions 12.1-12.6` is therefore
+the *correct standing defense*, not a workaround. Revisit only if the
+12.x host pool visibly shrinks (symptom: rising queue delays).
+
+**Avatar tiers decision:** three visualization levels —
+1. talking head (LAM, in prod), 2. half body with hands, 3. full body.
+**LHM (aigc3d, ICCV 2025, Apache 2.0) covers tiers 2 AND 3 with one worker:**
+the `-HF` checkpoints (LHM-500M-HF / LHM-1B-HF) accept half-body or
+full-body photos with no framing flag. ~2 s (500M) / ~6.6 s (1B) forward
+pass, 24 GB VRAM, SMPL-X-anchored gaussians (body animation via skeleton;
+Spark 2.0's experimental splat LBS is the natural web renderer for this).
+
+POC scaffolding (mirrors the LAM worker pattern):
+- `docker/lhm_worker.Dockerfile` — same cu121 base/stack; LHM-500M-HF weights
+  baked; optional `HF_TOKEN` build-arg (HF 403s anonymous pulls some days).
+- `worker/lhm_worker/handler.py` — `lhm_reconstruct` job runs LHM's
+  export_mesh path (`infer_mesh`: canonical gaussians, **no motion pass**,
+  save_ply is already standard 3DGS — no LAM-style patch needed). Output is
+  gzipped (full-body PLYs outgrow LAM's ~6 MB). Subprocess mode for the POC;
+  resident-lazy mode is the known follow-up.
+- `backend/app/pipeline/runpod_lhm.py` + `RUNPOD_LHM_ENDPOINT_ID` in config.
+
+Deploy: build+push `devopsavatar/lhm-worker:v1`, create endpoint (24 GB pool,
+FlashBoot, idleTimeout 300, **allowedCudaVersions 12.1-12.6**), set
+`RUNPOD_LHM_ENDPOINT_ID`, test with a half-body and a full-body photo, view
+PLYs in the triage viewer (`frontend/triage.html?ply=...`).
