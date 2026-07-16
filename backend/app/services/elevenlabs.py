@@ -4,15 +4,16 @@ from ..config import settings
 
 logger = logging.getLogger(__name__)
 
-# Free voices available on all ElevenLabs plans
+# Current premade voices (verified against GET /v1/voices 2026-07-14 — the
+# 2023-era set: Rachel/Domi/Antoni/Josh no longer exists on this account).
 VOICES = {
-    "Rachel": "21m00Tcm4TlvDq8ikWAM",
-    "Domi":   "AZnzlk1XvdvUeBnXmlld",
-    "Antoni": "ErXwobaYiN019PkySvjV",
-    "Josh":   "TxGEqnHWrfWFTfGW9XjX",
-    "Bella":  "EXAVITQu4vr4xnSDxMaL",
+    "Sarah":   "EXAVITQu4vr4xnSDxMaL",
+    "Roger":   "CwhRBWXzGAHq8TQ4Fs17",
+    "Laura":   "FGY2WhTYpPnrIDTdsKH5",
+    "George":  "JBFqnCBsd6RMkjVDRZzb",
+    "Charlie": "IKne3meq5aSn9XLyUdCD",
 }
-DEFAULT_VOICE = VOICES["Rachel"]
+DEFAULT_VOICE = VOICES["Sarah"]
 
 
 async def text_to_speech(text: str, voice_id: str = DEFAULT_VOICE) -> bytes:
@@ -30,7 +31,10 @@ async def text_to_speech(text: str, voice_id: str = DEFAULT_VOICE) -> bytes:
             },
             json={
                 "text": text,
-                "model_id": "eleven_monolingual_v1",
+                # monolingual_v1/multilingual_v1 were retired by ElevenLabs
+                # (API now 400s with "unsupported_model"); multilingual_v2
+                # also handles Spanish input.
+                "model_id": "eleven_multilingual_v2",
                 "voice_settings": {
                     "stability": 0.50,
                     "similarity_boost": 0.75,

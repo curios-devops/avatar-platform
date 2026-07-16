@@ -12,12 +12,14 @@ interface AvatarViewerProps {
   onBack?: () => void;
 }
 
+// Fallback list — the real source of truth is GET /api/v1/avatar/voices
+// (fetched on mount), so backend voice changes don't strand the UI again.
 const VOICES = [
-  { name: 'Rachel', id: '21m00Tcm4TlvDq8ikWAM' },
-  { name: 'Domi',   id: 'AZnzlk1XvdvUeBnXmlld' },
-  { name: 'Antoni', id: 'ErXwobaYiN019PkySvjV' },
-  { name: 'Josh',   id: 'TxGEqnHWrfWFTfGW9XjX' },
-  { name: 'Bella',  id: 'EXAVITQu4vr4xnSDxMaL' },
+  { name: 'Sarah',   id: 'EXAVITQu4vr4xnSDxMaL' },
+  { name: 'Roger',   id: 'CwhRBWXzGAHq8TQ4Fs17' },
+  { name: 'Laura',   id: 'FGY2WhTYpPnrIDTdsKH5' },
+  { name: 'George',  id: 'JBFqnCBsd6RMkjVDRZzb' },
+  { name: 'Charlie', id: 'IKne3meq5aSn9XLyUdCD' },
 ];
 
 export const AvatarViewer: React.FC<AvatarViewerProps> = ({
@@ -44,7 +46,21 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
   // Speak panel state
   const [showSpeak, setShowSpeak]   = useState(false);
   const [speakText, setSpeakText]   = useState('');
+  const [voices, setVoices]         = useState(VOICES);
   const [voiceId, setVoiceId]       = useState(VOICES[0].id);
+
+  // Voices live in the backend (ElevenLabs account) — sync on mount
+  useEffect(() => {
+    fetch(`${serverUrl}/api/v1/avatar/voices`)
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then((list: { name: string; voice_id: string }[]) => {
+        if (list.length) {
+          setVoices(list.map(v => ({ name: v.name, id: v.voice_id })));
+          setVoiceId(list[0].voice_id);
+        }
+      })
+      .catch(() => {}); // keep fallback list
+  }, [serverUrl]);
   const [speakStatus, setSpeakStatus] = useState<'idle' | 'loading' | 'playing'>('idle');
   const [speakError, setSpeakError] = useState<string | null>(null);
   const [suggOffset, setSuggOffset] = useState(0);
@@ -341,7 +357,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
                 value={voiceId}
                 onChange={e => setVoiceId(e.target.value)}
               >
-                {VOICES.map(v => (
+                {voices.map(v => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
               </select>
