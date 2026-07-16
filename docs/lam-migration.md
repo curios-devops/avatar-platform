@@ -172,3 +172,32 @@ Deploy: build+push `devopsavatar/lhm-worker:v1`, create endpoint (24 GB pool,
 FlashBoot, idleTimeout 300, **allowedCudaVersions 12.1-12.6**), set
 `RUNPOD_LHM_ENDPOINT_ID`, test with a half-body and a full-body photo, view
 PLYs in the triage viewer (`frontend/triage.html?ply=...`).
+
+**Deployed 2026-07-17:** `devopsavatar/lhm-worker:v1` pushed (first push died
+mid-blob on a broken pipe — plain `docker push` retry resumed the mounted
+layers). Endpoint `avatar-lhm-v1` = `vd52f2vtq86buv` (template `w10p5l00xu`,
+4090/A5000/3090/L4 pool, CUDA 12.1-12.6, 0-2 workers, FlashBoot, idle 300 s).
+Worker quota was 10/10 — freed it by `workersMax 2→0` on the dead legacy
+`avatar-mica` endpoint (`nwzu1fx25zkin9`); restore with the same PATCH if MICA
+is ever revived.
+
+## Viewer animation (2026-07-17)
+
+Static-PLY procedural animation shipped in the WebGPU viewer (commits
+9b98936 / da6ce7f / 93ac5de):
+- **Idle**: rigid model matrix (incommensurate-sine yaw/pitch/roll about a
+  neck pivot + breathing bob), folded into the view matrix on the CPU —
+  covariance math untouched, depth sort keeps the camera-only view.
+- **Mouth**: soft radial mask at (0, -0.06, 0.045) canonical, chin-weighted;
+  FFT amplitude ×2.4 gain, fast-attack/0.25-release smoothing.
+- **Blink**: one tight mask PER eye (1.0-2.6 cm falloff, lid line y=0.032).
+  Lesson: masks wider than half the eye separation (6.6 cm) merge across the
+  nose bridge and read as a stretched band — same failure mode as the
+  original "everything below y=0" jaw placeholder.
+- Debug hooks: `?amp=`, `?blink=`, `?noidle=1`, live `amp N.NN` in the fps
+  badge. Verification method: pixel-diff of forced-state screenshots
+  (`.triage/ab_*.png`) — bbox of changed pixels must stay inside the
+  intended feature.
+
+True lipsync (tier B) still requires LAM's rigged export +
+LAM_Audio2Expression + splat LBS (Spark 2.0 spike).
