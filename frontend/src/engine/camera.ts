@@ -86,7 +86,13 @@ export class Camera {
     if (!this.isDragging) return;
     this.rotY += (e.clientX - this.lastX) * 0.005;
     this.rotX += (e.clientY - this.lastY) * 0.005;
-    this.rotX  = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotX));
+    // Clamp the orbit to a portrait envelope. A one-shot LAM head only has real
+    // geometry for what the front photo saw — the chin/neck underside and the
+    // far back are dark, ragged filler. Past these limits you rotate into that
+    // unreconstructed region (the "black lines" the user saw). Keep the pleasant
+    // front-3/4 range, hide the rest. -0.20..0.45 rad ≈ -11°..+26° pitch.
+    this.rotX = Math.max(-0.20, Math.min(0.45, this.rotX));
+    this.rotY = Math.max(-0.70, Math.min(0.70, this.rotY));  // ±40° yaw
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   }

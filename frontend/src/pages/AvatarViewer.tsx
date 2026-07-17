@@ -19,6 +19,11 @@ const FORCED_BLINK = _dbgParam('blink');
 // ?noidle=1 freezes the idle sway — clean A/B for mouth/blink tuning
 const NO_IDLE      = _dbgParam('noidle') === 1;
 
+// Procedural idle sway + eye blink are OFF: they read as artificial, and the
+// real head_pose + eyeBlink arrive with tier B (LAM rig + Audio2Expression /
+// ARKit stream). Mouth lipsync stays on. Flip to true (or ?anim=1) to A/B.
+const PROCEDURAL_ANIM = _dbgParam('anim') === 1;
+
 // Speech envelope gain. 2.4 pinned the value at 1.0 (loud speech saturates);
 // 1.5 lands typical speech in the 0.4-0.9 range the mouth is tuned for.
 const AMP_GAIN = 1.5;
@@ -177,30 +182,31 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
           renderer.setAmplitude(ampSmooth);
           ampLiveRef.current = ampSmooth;
 
-          // Blink scheduler: closed→hold→open envelope at random intervals
-          const nowMs = performance.now();
+          // Eye blink (procedural) — off by default; real eyeBlink comes with
+          // the tier-B ARKit stream.
           let blink = 0;
-          const bt = nowMs - blinkAt;
-          if (bt >= 0) {
-            if (bt < BLINK_CLOSE)                    blink = bt / BLINK_CLOSE;
-            else if (bt < BLINK_CLOSE + BLINK_HOLD)  blink = 1;
-            else if (bt < BLINK_CLOSE + BLINK_HOLD + BLINK_OPEN)
-              blink = 1 - (bt - BLINK_CLOSE - BLINK_HOLD) / BLINK_OPEN;
-            else blinkAt = nowMs + nextBlinkDelay();
+          if (PROCEDURAL_ANIM) {
+            const nowMs = performance.now();
+            const bt = nowMs - blinkAt;
+            if (bt >= 0) {
+              if (bt < BLINK_CLOSE)                    blink = bt / BLINK_CLOSE;
+              else if (bt < BLINK_CLOSE + BLINK_HOLD)  blink = 1;
+              else if (bt < BLINK_CLOSE + BLINK_HOLD + BLINK_OPEN)
+                blink = 1 - (bt - BLINK_CLOSE - BLINK_HOLD) / BLINK_OPEN;
+              else blinkAt = nowMs + nextBlinkDelay();
+            }
           }
           if (FORCED_BLINK !== null) blink = FORCED_BLINK;
-          // Optional-chain: after a hot-reload the live renderer instance can
-          // predate setBlink; without the guard the throw killed the whole
-          // loop mid-frame (idle stopped, eyes froze half-closed).
           renderer.setBlink?.(blink);
 
-          // Idle sway runs always (speaking or mute); folded into the view
-          // matrix so shader covariance stays correct. Depth sort keeps the
-          // camera-only view (sway angles are too small to change the order).
+          // Idle sway (procedural) — off by default; folded into the view matrix
+          // when on so shader covariance stays correct, and the depth sort keeps
+          // the camera-only view. Real head_pose comes with the tier-B stream.
           const t = (performance.now() - t0) / 1000;
           const view = camera.getViewMatrix();
+          const useIdle = PROCEDURAL_ANIM && !NO_IDLE;
           renderer.updateCamera(
-            NO_IDLE ? view : mulMat4(view, idleModelMatrix(t, ampSmooth)),
+            useIdle ? mulMat4(view, idleModelMatrix(t, ampSmooth)) : view,
             camera.getProjectionMatrix(),
             view,
           );
