@@ -19,9 +19,9 @@ const FORCED_BLINK = _dbgParam('blink');
 // ?noidle=1 freezes the idle sway — clean A/B for mouth/blink tuning
 const NO_IDLE      = _dbgParam('noidle') === 1;
 
-// Average FFT magnitude of speech peaks around ~0.3 — map that towards 1
-// so the mouth displacement range is actually used while talking.
-const AMP_GAIN = 2.4;
+// Speech envelope gain. 2.4 pinned the value at 1.0 (loud speech saturates);
+// 1.5 lands typical speech in the 0.4-0.9 range the mouth is tuned for.
+const AMP_GAIN = 1.5;
 
 // Blink timing (ms): fast close, brief hold, slower open — like a real blink
 const BLINK_CLOSE = 70, BLINK_HOLD = 40, BLINK_OPEN = 110;
@@ -189,7 +189,10 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
             else blinkAt = nowMs + nextBlinkDelay();
           }
           if (FORCED_BLINK !== null) blink = FORCED_BLINK;
-          renderer.setBlink(blink);
+          // Optional-chain: after a hot-reload the live renderer instance can
+          // predate setBlink; without the guard the throw killed the whole
+          // loop mid-frame (idle stopped, eyes froze half-closed).
+          renderer.setBlink?.(blink);
 
           // Idle sway runs always (speaking or mute); folded into the view
           // matrix so shader covariance stays correct. Depth sort keeps the
@@ -250,6 +253,9 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
     const source   = ctx.createMediaElementSource(audio);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
+    // Default 0.8 ramps the FFT up over ~0.8 s — the mouth lagged noticeably
+    // behind speech onset. 0.15 keeps it responsive without 60 fps flutter.
+    analyser.smoothingTimeConstant = 0.15;
     source.connect(analyser);
     analyser.connect(ctx.destination);
 
@@ -406,6 +412,8 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
               <button onClick={shuffleSuggestions} style={css.shuffleBtn} title="More suggestions">🔀</button>
             </div>
             <textarea
+              id="speak-text"
+              name="speak-text"
               style={css.speakTextarea}
               placeholder="Hello! I'm your personal 3D avatar…"
               value={speakText}
@@ -415,6 +423,9 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
             />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' as const }}>
               <select
+                id="voice-select"
+                name="voice-select"
+                aria-label="Voice"
                 style={css.voiceSelect}
                 value={voiceId}
                 onChange={e => setVoiceId(e.target.value)}
@@ -586,8 +597,8 @@ const css: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.05)',
   },
   playingBadge: {
-    position: 'absolute', bottom: 12, left: '50%',
-    transform: 'translateX(-50%)',
+    // Bottom-left corner — centred it covered the mouth we're animating.
+    position: 'absolute', bottom: 12, left: 12,
     background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
     padding: '6px 14px', borderRadius: 20,
     display: 'flex', alignItems: 'center', gap: 6,

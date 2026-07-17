@@ -330,16 +330,16 @@ fn vs_main(
   var center = positions[si].xyz;
   let scale  = scales[si].xyz;
 
-  // Speech motion: soft radial mask around the lips, so only the mouth area
-  // moves (the old version shifted everything below y=0 — the whole lower
-  // face stretched like a band). Mouth centre in LAM canonical space
-  // (head spans y ∈ [-0.22, 0.15], face at +z).
-  let mouth  = vec3<f32>(0.0, -0.06, 0.045);
-  let m_dist = distance(center, mouth);
-  let m_mask = 1.0 - smoothstep(0.030, 0.095, m_dist);
-  // Chin follows fully, upper lip barely — a jaw opens downward only.
-  let below  = clamp(0.5 - (center.y - mouth.y) * 12.0, 0.0, 1.0);
-  let drop   = u_speak.amplitude * 0.024 * m_mask * (0.25 + 0.75 * below);
+  // Speech motion: radial mask centred between the lower lip and chin, times
+  // a vertical gate that hard-protects the nose/upper face. The previous
+  // 9.5 cm radial-only mask reached the base of the nose and deformed it.
+  // Mouth-region centre in LAM canonical space (head y ∈ [-0.22, 0.15], +z).
+  let mouth  = vec3<f32>(0.0, -0.075, 0.050);
+  let m_mask = 1.0 - smoothstep(0.022, 0.072, distance(center, mouth));
+  // vgate = 0 above the upper-lip line (y > -0.032), 1 at/below the lips —
+  // the nose base (y ≈ -0.02) gets zero displacement.
+  let vgate  = 1.0 - smoothstep(-0.052, -0.032, center.y);
+  let drop   = u_speak.amplitude * 0.030 * m_mask * vgate;
   center = vec3<f32>(center.x, center.y - drop, center.z - drop * 0.3);
 
   // Blink: one tight mask PER eye (like the mouth), squashing splats toward
