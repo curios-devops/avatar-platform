@@ -89,3 +89,55 @@ M0 is pure de-risk and blocks nothing else — do it first. M1 (worker/Blender)
 and M2 (Audio2Expression) are independent and can build in parallel (both are
 long GPU image builds, run unattended). M3 depends on M0's API finding and a
 sample asset from M1. Total ~3-4 focused days, dominated by image builds.
+
+## M0 spike result (2026-07-17) — live drive CONFIRMED
+`LAM_WebRender` (`gaussian-splat-renderer-for-lam@0.0.9-alpha.1`, WebGL/Vite,
+NOT three.js) takes a **pull callback** in `getInstance(div, zip, opts)`:
+`opts.getExpressionData()` is called **every render frame** and returns
+`{ arkitName: weight }` for the current moment — so live per-frame drive synced
+to `audio.currentTime` works (no pre-baked clip needed). Also `getChatState()`
+→ Idle/Listening/Thinking/Responding (built-in idle behaviours). Sample
+`test_expression_1s.json` = `names`[52 ARKit] + `frames`[973×weights] +
+`head_pose`[973] at 30 fps. Biggest risk retired.
+
+## Architecture review (asked 2026-07-17)
+
+**What Blender actually does:** only mesh→GLB rigging
+(`tools/generateARKITGLBWithBlender.py`): FLAME shaped-head mesh + a template
+FBX → `skin.glb` (skinning weights + ARKit blendshapes). The **gaussians are
+neural-net output** (`offset.ply`), not Blender. ZIP = `offset.ply` +
+`skin.glb` + `animation.glb` + FLAME runtime data.
+
+**Key consequence:** FLAME topology is CONSTANT across every avatar — only the
+shaped vertices differ. So the rig/skinning/blendshape structure is identical
+for all heads; Blender is repackaging fixed data. ⇒ **Blender in the
+per-reconstruction hot path is avoidable**: pre-bake one template `skin.glb`
+and swap shaped vertices, or write a pure-Python FLAME→GLB exporter. Verify in
+M1 before baking headless Blender into the worker.
+
+**Was our custom-WebGPU + procedural path a mistake?** Mixed:
+- Right: gave a working static preview in hours; it is the ONLY renderer for
+  the LHM **body** tier (LAM_WebRender is FLAME-head-only); no external deps.
+- Wrong for the head: we re-implemented EWA splatting from scratch (cost a
+  night of orientation/black-line bugs) when LAM already shipped a working
+  WebGL renderer, and procedural mouth can never reach phoneme lipsync. For
+  the talking-head goal specifically, adopting LAM_WebRender from day one would
+  have been better. The procedural idle/blink is largely superseded for the
+  head (ARKit stream carries eyeBlink + head_pose) but still serves the body.
+
+**Real architectural smell of tier B:** two renderers — LAM_WebRender (head) +
+our WebGPU (body). Not unified, and the npm pkg is alpha (0.0.9-alpha.1).
+
+**Spark 2.0 (World Labs) as the eventual unifier:** three.js/WebGL2, 100M+
+splats, streamable LoD + foveation, **experimental** linear-blend skinning,
+GPU shader-graph for dynamic splat effects, relighting. Real-time *shadows* are
+not a clearly documented first-class feature (relighting is). It could unify
+head+body+LoD under one renderer, but its skinning is experimental and porting
+the LAM rig into it is real work. Shadows add little to a head on a plain bg;
+they matter for full-body/scene grounding. ⇒ Spark is a LATER unification
+milestone, not now.
+
+**Recommendation:** adopt LAM_WebRender now for head lipsync (fastest path to
+the actual goal, live drive proven), but keep Blender OUT of the per-job path
+(M1 pure-Python/pre-baked rig). Keep WebGPU for the body tier. Revisit Spark
+2.0 only when the two-renderer split hurts or we need scene-scale/shadows.
