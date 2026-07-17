@@ -342,19 +342,23 @@ fn vs_main(
   let drop   = u_speak.amplitude * 0.030 * m_mask * vgate;
   center = vec3<f32>(center.x, center.y - drop, center.z - drop * 0.3);
 
-  // Blink: one tight mask PER eye (like the mouth), squashing splats toward
-  // the lid line. Outer radius must stay well under half the eye separation
-  // (6.6 cm) — a 4.2 cm mask merged across the nose bridge and dragged
-  // eyebrows/cheek with it, reading as a stretched band.
+  // Blink: one tight mask PER eye, squashing splats toward the lid line.
+  // Eye/lid measured from the LAM head's dark facial splats: centre
+  // (±0.037, 0.024, 0.033); eyebrows sit at y ≈ 0.035-0.050, so a brow_gate
+  // zeroes displacement above the lid — otherwise the brows drop with the lid.
+  // (Outer radius also stays well under half the 7.4 cm eye separation, or
+  // the two masks merge across the nose bridge into a band.)
   if (u_speak.blink > 0.001) {
-    let lid_y  = 0.032;
-    let d_l = distance(center, vec3<f32>(-0.033, lid_y, 0.045));
-    let d_r = distance(center, vec3<f32>( 0.033, lid_y, 0.045));
+    let lid_y = 0.024;
+    let d_l = distance(center, vec3<f32>(-0.037, lid_y, 0.033));
+    let d_r = distance(center, vec3<f32>( 0.037, lid_y, 0.033));
     let e_mask = max(
-      1.0 - smoothstep(0.010, 0.026, d_l),
-      1.0 - smoothstep(0.010, 0.026, d_r),
-    ) * u_speak.blink;
-    center = vec3<f32>(center.x, center.y - (center.y - lid_y) * 0.8 * e_mask, center.z);
+      1.0 - smoothstep(0.008, 0.020, d_l),
+      1.0 - smoothstep(0.008, 0.020, d_r),
+    );
+    let brow_gate = 1.0 - smoothstep(0.030, 0.042, center.y);
+    let em = e_mask * brow_gate * u_speak.blink;
+    center = vec3<f32>(center.x, center.y - (center.y - lid_y) * 0.9 * em, center.z);
   }
 
   var out: VOut;
