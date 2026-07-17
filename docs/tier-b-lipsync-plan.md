@@ -141,3 +141,25 @@ milestone, not now.
 the actual goal, live drive proven), but keep Blender OUT of the per-job path
 (M1 pure-Python/pre-baked rig). Keep WebGPU for the body tier. Revisit Spark
 2.0 only when the two-renderer split hurts or we need scene-scale/shadows.
+
+## M1 progress (2026-07-17) — Blender-free export PROVEN
+- Official `p2-1.zip` layout decoded: `{name}/skin.glb + offset.ply +
+  animation.glb + vertex_order.json`. `skin.glb` = 1 mesh, POSITION 20018
+  verts (matches our 20018 splats → 1 gaussian/vertex), JOINTS/WEIGHTS skin,
+  **51 ARKit morph targets**, 264-node skeleton, 0 animations (those live in
+  animation.glb).
+- Per-avatar data = `offset.ply` (neural) + the POSITION block of `skin.glb`.
+  Everything else (rig, weights, 51 morphs, animation.glb, vertex_order.json)
+  is the fixed FLAME template.
+- `tools/lam_asset_export/inject_flame_vertices.py`: pure-Python GLB POSITION
+  swap. Round-trips the official skin.glb losslessly (0.0 diff, morphs/skin
+  preserved); the repackaged ZIP renders + animates identically in
+  LAM_WebRender. **Blender fully removed with zero realism impact — verified.**
+- Renderer also validated end-to-end: `gaussian-splat-renderer-for-lam` demo
+  renders the sample avatar and drives it from the per-frame ARKit callback.
+
+### Remaining M1
+Extract the avatar FLAME vertices from the LAM worker (20018-vert template
+order), confirm our offset.ply gaussian format/scale matches the template's
+standing-figure frame (head y≈1.5–1.8 m), bake the 3 template files into the
+worker image, wire the injector, upload ZIP to R2, return `asset_zip_url`.
