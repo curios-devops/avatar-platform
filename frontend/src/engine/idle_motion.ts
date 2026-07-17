@@ -34,13 +34,18 @@ const NECK_PIVOT_Y = -0.15;
  * Angles stay under ~4° so the small-rotation sort approximation holds.
  */
 export function idleModelMatrix(t: number, amp: number): Float32Array {
+  // Ease in from the rest pose: at t=0 every term is 0 → identity, so the
+  // avatar first shows exactly the captured image, then eases into the sway
+  // over ~1.5 s instead of popping into a tilted pose on the first frame.
+  const ease = Math.min(t / 1.5, 1.0);
+
   // Two incommensurate sines per axis → organic, never-repeating sway. The
   // amp-driven nod is deliberately small (0.02): at 0.05 a saturated speech
   // envelope produced a fast metronome nod that buried the base idle sway.
-  const yaw   = 0.05  * Math.sin(0.6 * t)       + 0.02 * Math.sin(1.7 * t + 1.3);
-  const pitch = 0.03  * Math.sin(0.9 * t + 0.5) + amp * 0.02 * Math.sin(4.5 * t);
-  const roll  = 0.012 * Math.sin(0.4 * t + 2.0);
-  const ty    = 0.0025 * Math.sin(1.1 * t);     // breathing bob (±2.5 mm)
+  const yaw   = ease * (0.05  * Math.sin(0.6 * t)       + 0.02 * Math.sin(1.7 * t + 1.3));
+  const pitch = ease * (0.03  * Math.sin(0.9 * t + 0.5) + amp * 0.02 * Math.sin(4.5 * t));
+  const roll  = ease * (0.012 * Math.sin(0.4 * t + 2.0));
+  const ty    = ease * 0.0025 * Math.sin(1.1 * t);     // breathing bob (±2.5 mm)
 
   const cy = Math.cos(yaw),   sy = Math.sin(yaw);
   const cx = Math.cos(pitch), sx = Math.sin(pitch);
