@@ -74,6 +74,15 @@ def do_bootstrap() -> dict:
             f"soundfile imageio[ffmpeg] 'huggingface_hub[cli]<1.0'")
         (DEPS / ".ok").touch()
         steps.append("deps")
+    if not (DEPS / ".pins_torch201").exists():
+        # la base es torch 2.0.1: transformers/diffusers modernos usan
+        # torch.utils._pytree.register_pytree_node (torch>=2.1) → pinear a la
+        # generación compatible.
+        _sh(f"pip install --no-cache-dir --target {DEPS} --upgrade "
+            f"'transformers==4.33.2' 'diffusers==0.27.2' 'accelerate==0.25.0' "
+            f"'huggingface_hub==0.25.2' 'tokenizers<0.14'")
+        (DEPS / ".pins_torch201").touch()
+        steps.append("pins_torch201")
     if not (MUSETALK_ROOT / "models/musetalkV15/unet.pth").exists():
         dw = MUSETALK_ROOT / "download_weights.sh"
         if dw.exists():
