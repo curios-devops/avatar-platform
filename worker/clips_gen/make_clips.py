@@ -9,9 +9,13 @@ gesto ∈ idle_a|idle_b|listen|gesture_enum|gesture_open):
   gesture_enum.mp4         enumerar con las manos visibles
   gesture_open.mp4         gesto abierto, manos visibles
 
-Backends (elegir por VRAM disponible, regla del plan):
+Backends (elegir por VRAM/infra disponible):
+  veo        Veo 2 (Vertex AI, curios-vertex) — API, corre desde el portátil,
+             consume créditos GCP (~8 s/clip). Sin pod. RECOMENDADO para
+             validar A1 rápido.
   wan        Wan2.2-S2V-14B  (≥ 40 GB VRAM) — repo Wan2.2, task s2v-14B
   echomimic  EchoMimicV3     (≥ 16 GB VRAM) — repo EchoMimicV3
+(self-hosted = economía por avatar en producción; veo = velocidad hoy)
 
 Ambos son audio-driven: para clips SIN habla se les da un WAV de silencio
 de la duración objetivo y el prompt lleva la instrucción de actitud/gesto.
@@ -88,8 +92,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--photo", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--backend", choices=["wan", "echomimic"], required=True)
-    ap.add_argument("--repo", required=True, type=Path, help="clon del repo del backend")
+    ap.add_argument("--backend", choices=["veo", "wan", "echomimic"], required=True)
+    ap.add_argument("--repo", type=Path, help="clon del repo del backend (wan/echomimic)")
     ap.add_argument("--ckpt", type=Path, help="dir de pesos (wan)")
     ap.add_argument("--only", nargs="*", help="generar solo estos clips")
     args = ap.parse_args()
@@ -101,12 +105,17 @@ def main() -> int:
         out = args.out / f"{name}.mp4"
         if out.exists():
             print(f"[skip] {out} ya existe"); continue
-        wav = silent_wav(args.out / f"_{name}_silence.wav", seconds)
         print(f"[gen ] {name} ({seconds}s, {args.backend})…")
-        if args.backend == "wan":
-            assert args.ckpt, "--ckpt requerido para wan"
+        if args.backend == "veo":
+            from veo_backend import generate_clip
+            generate_clip(args.photo, f"{attitude}, {BASE_PROMPT}", out, seconds)
+        elif args.backend == "wan":
+            assert args.repo and args.ckpt, "--repo y --ckpt requeridos para wan"
+            wav = silent_wav(args.out / f"_{name}_silence.wav", seconds)
             run_wan(args.repo, args.ckpt, args.photo, wav, attitude, out)
         else:
+            assert args.repo, "--repo requerido para echomimic"
+            wav = silent_wav(args.out / f"_{name}_silence.wav", seconds)
             run_echomimic(args.repo, args.photo, wav, attitude, out)
         print(f"[ok  ] {out}")
     return 0

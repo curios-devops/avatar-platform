@@ -30,7 +30,20 @@ encuadre medio-cuerpo que piden los prompts).
 - VRAM real con `--offload_model True`; si OOM en 48 GB → EchoMimicV3.
 - Duración: S2V genera la longitud del audio (silencio de N s) por segmentos.
 
+## Backend Veo (añadido 2026-07-19)
+`--backend veo` genera desde el portátil vía Vertex AI (`curios-vertex`,
+us-central1, ADC con `gcloud auth application-default login`). Catálogo
+verificado en el proyecto: veo-2.0 / 3.0 / 3.0-fast / 3.1 / 3.1-fast, todos
+con image-to-video. **"Gemini Omni (video output)" NO existe en Vertex** —
+404 en todos los ids; los Gemini del endpoint express solo aceptan VIDEO como
+entrada, no como salida (verificado empíricamente).
+
+Economía: Veo consume créditos GCP por segundo de video → ideal para validar
+A1 ya; para producción por-avatar los self-hosted (EchoMimicV3/Wan2.2) siguen
+siendo el destino (céntimos vs dólares por avatar).
+
 ## Estado
 - [x] Scripts escritos (2026-07-18)
-- [ ] Ejecutados en pod GPU → clips reales
-- [ ] `prep_clips.py` validado sobre clips reales (aceptación A1)
+- [x] Backend Veo funcionando desde el portátil (2026-07-19)
+- [ ] Comparativa veo-2.0 vs 3.1-fast vs 3.1 → elegir (mejor salvo lite razonable)
+- [ ] 5 clips con el ganador + `prep_clips.py` (aceptación A1)
