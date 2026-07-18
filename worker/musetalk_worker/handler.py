@@ -74,15 +74,18 @@ def do_bootstrap() -> dict:
             f"soundfile imageio[ffmpeg] 'huggingface_hub[cli]<1.0'")
         (DEPS / ".ok").touch()
         steps.append("deps")
-    if not (DEPS / ".pins_torch201").exists():
-        # la base es torch 2.0.1: transformers/diffusers modernos usan
-        # torch.utils._pytree.register_pytree_node (torch>=2.1) → pinear a la
-        # generación compatible.
-        _sh(f"pip install --no-cache-dir --target {DEPS} --upgrade "
+    if not (DEPS / ".hfstack_v2").exists():
+        # Base torch 2.0.1: el stack HF debe ser de esa generación, y pip
+        # --target --upgrade NO reemplaza limpio (deja árboles mezclados de
+        # versiones → imports rotos tipo cached_download). Nuke + reinstalar
+        # el conjunto en una sola transacción.
+        _sh(f"rm -rf {DEPS}/diffusers* {DEPS}/transformers* {DEPS}/huggingface_hub* "
+            f"{DEPS}/accelerate* {DEPS}/tokenizers* {DEPS}/safetensors*")
+        _sh(f"pip install --no-cache-dir --target {DEPS} "
             f"'transformers==4.33.2' 'diffusers==0.27.2' 'accelerate==0.25.0' "
-            f"'huggingface_hub==0.25.2' 'tokenizers<0.14'")
-        (DEPS / ".pins_torch201").touch()
-        steps.append("pins_torch201")
+            f"'huggingface_hub==0.25.2' 'tokenizers>=0.13.3,<0.14' 'safetensors>=0.3.1'")
+        (DEPS / ".hfstack_v2").touch()
+        steps.append("hfstack_v2")
     if not (MUSETALK_ROOT / "models/musetalkV15/unet.pth").exists():
         dw = MUSETALK_ROOT / "download_weights.sh"
         if dw.exists():
