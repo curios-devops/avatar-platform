@@ -82,19 +82,45 @@ def normalize_colors(clips: dict[str, Path], out_dir: Path, ref_name: str = "idl
 
 # ── 2. clip_graph por pose ───────────────────────────────────────────────────
 
+_POSE_MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
+                   "pose_landmarker_lite/float16/1/pose_landmarker_lite.task")
+
+
+def _pose_model() -> Path:
+    """Descarga (una vez) el modelo de la Tasks API — mediapipe ≥0.10.14
+    eliminó la API legacy `solutions`."""
+    dest = Path.home() / ".cache" / "mediapipe" / "pose_landmarker_lite.task"
+    if not dest.exists():
+        import urllib.request
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        print(f"[pose ] descargando modelo → {dest}")
+        urllib.request.urlretrieve(_POSE_MODEL_URL, dest)
+    return dest
+
+
 def pose_series(path: Path):
     """Vector de pose por frame analizado (landmarks normalizados)."""
     import mediapipe as mp
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
     frames, fps = read_frames(path, stride=_STRIDE)
-    with mp.solutions.pose.Pose(static_image_mode=False, model_complexity=0) as pose:
-        vecs = []
-        for f in frames:
-            res = pose.process(cv2.cvtColor(f, cv2.COLOR_BGR2RGB))
-            if res.pose_landmarks is None:
+    opts = vision.PoseLandmarkerOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(_pose_model())),
+        running_mode=vision.RunningMode.VIDEO,
+    )
+    vecs = []
+    with vision.PoseLandmarker.create_from_options(opts) as lmk:
+        for i, f in enumerate(frames):
+            img = mp.Image(image_format=mp.ImageFormat.SRGB,
+                           data=cv2.cvtColor(f, cv2.COLOR_BGR2RGB))
+            ts_ms = int(i * _STRIDE * 1000 / fps)
+            res = lmk.detect_for_video(img, ts_ms)
+            if not res.pose_landmarks:
                 vecs.append(None)
                 continue
-            lm = res.pose_landmarks.landmark
-            vecs.append(np.array([[lm[i].x, lm[i].y] for i in _POSE_IDS]).flatten())
+            lm = res.pose_landmarks[0]
+            vecs.append(np.array([[lm[j].x, lm[j].y] for j in _POSE_IDS]).flatten())
     return vecs, fps
 
 

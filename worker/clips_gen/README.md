@@ -45,5 +45,14 @@ siendo el destino (céntimos vs dólares por avatar).
 ## Estado
 - [x] Scripts escritos (2026-07-18)
 - [x] Backend Veo funcionando desde el portátil (2026-07-19)
-- [ ] Comparativa veo-2.0 vs 3.1-fast vs 3.1 → elegir (mejor salvo lite razonable)
-- [ ] 5 clips con el ganador + `prep_clips.py` (aceptación A1)
+- [x] Comparativa (2026-07-19): **veo-3.1-fast GANA** — encuadre fijo, identidad
+      intacta, parpadeo natural, boca cerrada. veo-3.1 deriva a sonrisa;
+      veo-2.0 DESCARTADO (zoom de cámara + boca hablando). ~50-65 s/clip.
+      Hoja: `.triage/veo_cmp/comparison_sheet.jpg`
+- [x] 5 clips generados con veo-3.1-fast + `prep_clips.py` OK: color
+      normalizado, clip_graph 60 aristas, preview idle_a→gesture_enum→idle_b
+      con cortes limpios (coste pose 0.008-0.009) — ACEPTACIÓN A1 ✅
+      (`.triage/clips/prepped/`)
+- Limitación conocida: `listen` muestra boca entreabierta a mitad de clip
+  (los estados hablando los repinta MuseTalk; para listen, considerar
+  regenerar o usar segmento con boca cerrada del propio clip)
