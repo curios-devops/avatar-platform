@@ -65,10 +65,11 @@ def do_bootstrap() -> dict:
         # al target del volumen; torch ya está en la imagen base.
         _sh(f"pip install --no-cache-dir --target {DEPS} -r {MUSETALK_ROOT}/requirements.txt "
             f"|| true")
-        _sh(f"pip install --no-cache-dir --target {DEPS} -U openmim")
-        env = f"PYTHONPATH={DEPS} "
-        _sh(f"{env}python -m mim install --target {DEPS} mmengine 'mmcv==2.0.1' "
-            f"'mmdet==3.1.0' 'mmpose==1.1.0'")
+        # mmcv desde las wheels precompiladas de OpenMMLab (mim no soporta
+        # --target; pip con el find-links equivalente sí es determinista)
+        _sh(f"pip install --no-cache-dir --target {DEPS} 'mmcv==2.0.1' "
+            f"-f https://download.openmmlab.com/mmcv/dist/cu118/torch2.0/index.html")
+        _sh(f"pip install --no-cache-dir --target {DEPS} mmengine 'mmdet==3.1.0' 'mmpose==1.1.0'")
         _sh(f"pip install --no-cache-dir --target {DEPS} transformers accelerate librosa "
             f"soundfile imageio[ffmpeg] 'huggingface_hub[cli]<1.0'")
         (DEPS / ".ok").touch()
