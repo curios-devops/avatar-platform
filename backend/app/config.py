@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     RUNPOD_MICA_ENDPOINT_ID: Optional[str] = None           # MICA multi-view identity (legacy)
     RUNPOD_LAM_ENDPOINT_ID: Optional[str] = None            # LAM one-shot gaussian head (tier 1)
     RUNPOD_LHM_ENDPOINT_ID: Optional[str] = None            # LHM half/full-body gaussian (tiers 2-3)
+    RUNPOD_MUSETALK_ENDPOINT_ID: Optional[str] = None       # A2 lip-sync serverless (etapa A)
     RUNPOD_EMOCA_ENDPOINT_ID: Optional[str] = None          # EMOCA detailed mesh + albedo
     # Seconds a LAM worker stays warm (billed) after its last job. Synced to
     # the RunPod endpoint at backend startup — .env is the source of truth.
