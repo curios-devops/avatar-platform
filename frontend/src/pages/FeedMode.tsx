@@ -124,7 +124,13 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
         else setEstado('pensando');
       }
     };
-    return () => { ws.close(); mseRef.current.stop(); };
+    return () => {
+      // StrictMode monta dos veces en dev: cerrar un WS aún CONNECTING lanza
+      // el warning "closed before established" — esperar a open para cerrar.
+      if (ws.readyState === WebSocket.OPEN) ws.close();
+      else ws.onopen = () => ws.close();
+      mseRef.current.stop();
+    };
   }, [serverUrl]);
 
   const enviarTexto = () => {
@@ -151,7 +157,16 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
       rec.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(parts, { type: 'audio/webm' });
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer())));
+        // pulsación demasiado corta → webm vacío/truncado (el ffmpeg del STT
+        // fallaba con "EBML/End of file"); descartar sin enviar
+        if (blob.size < 2000) { setEstado('idle'); return; }
+        // FileReader en vez de btoa(String.fromCharCode(...)) — el spread
+        // revienta la pila con blobs grandes (>~100 KB)
+        const b64 = await new Promise<string>((res) => {
+          const fr = new FileReader();
+          fr.onload = () => res((fr.result as string).split(',')[1]);
+          fr.readAsDataURL(blob);
+        });
         wsRef.current?.send(JSON.stringify({ type: 'user_audio', audio_b64: b64, mime: 'audio/webm' }));
         setEstado('pensando');
       };

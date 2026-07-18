@@ -81,9 +81,14 @@ class Settings(BaseSettings):
     MAX_PHOTO_SIZE_MB: int = 20
 
     # ── ETAPA A: orquestador conversacional (docs/nueva_arquitectura.md) ──────
-    ORCH_LLM_PROVIDER: str = "openai"          # openai | gemini
-    ORCH_OPENAI_MODEL: str = "gpt-4o-mini"     # rápido y barato para chat hablado
-    ORCH_GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Primario + fallback intercambiables por env. Medido 2026-07-19 (TTFT):
+    # gemini-3.1-flash-lite ~880ms ≈ gpt-4o-mini ~900-1200ms;
+    # gemini-2.5-flash/lite ~11s por el express (thinking) — NO usar en chat.
+    ORCH_LLM_PRIMARY: str = "gemini"           # gemini | openai
+    ORCH_LLM_FALLBACK: str = "openai"
+    ORCH_FIRST_TOKEN_TIMEOUT_S: float = 4.0    # si el primario no arranca, conmutar
+    ORCH_OPENAI_MODEL: str = "gpt-4o-mini"
+    ORCH_GEMINI_MODEL: str = "gemini-3.1-flash-lite"
     ORCH_WHISPER_MODEL: str = "base"           # faster-whisper: tiny|base|small…
     # Persona del avatar (clon digital) — None usa el prompt por defecto
     ORCH_SYSTEM_PROMPT: Optional[str] = None

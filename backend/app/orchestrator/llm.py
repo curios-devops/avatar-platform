@@ -32,16 +32,40 @@ _DEFAULT_PROMPT = (
 SYSTEM_PROMPT = settings.ORCH_SYSTEM_PROMPT or _DEFAULT_PROMPT
 
 
+_STREAMS = {"openai": lambda t, h: _openai_stream(t, h),
+            "gemini": lambda t, h: _gemini_stream(t, h)}
+
+
 async def stream_tokens(user_text: str, history: list[dict] | None = None) -> AsyncIterator[str]:
-    provider = settings.ORCH_LLM_PROVIDER.lower()
-    if provider == "openai":
-        agen = _openai_stream(user_text, history or [])
-    elif provider == "gemini":
-        agen = _gemini_stream(user_text, history or [])
-    else:
-        raise ValueError(f"ORCH_LLM_PROVIDER desconocido: {provider!r}")
-    async for tok in agen:
-        yield tok
+    """Primario con timeout de primer token; si no arranca (o falla antes de
+    emitir nada), conmuta al fallback. Ambos intercambiables por env."""
+    import asyncio
+
+    history = history or []
+    order = [settings.ORCH_LLM_PRIMARY.lower()]
+    fb = settings.ORCH_LLM_FALLBACK.lower()
+    if fb and fb not in order:
+        order.append(fb)
+
+    for i, provider in enumerate(order):
+        agen = _STREAMS[provider](user_text, history)
+        emitted = False
+        try:
+            while True:
+                if not emitted:
+                    tok = await asyncio.wait_for(
+                        agen.__anext__(), timeout=settings.ORCH_FIRST_TOKEN_TIMEOUT_S)
+                else:
+                    tok = await agen.__anext__()
+                emitted = True
+                yield tok
+        except StopAsyncIteration:
+            return
+        except Exception as exc:
+            if emitted or i == len(order) - 1:
+                raise
+            logger.warning("LLM %s no arrancó (%s) — fallback a %s",
+                           provider, type(exc).__name__, order[i + 1])
 
 
 async def _openai_stream(user_text: str, history: list[dict]) -> AsyncIterator[str]:
