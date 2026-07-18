@@ -79,6 +79,14 @@ class Settings(BaseSettings):
     MAX_AUDIO_SIZE_MB: int = 50
     MAX_PHOTO_SIZE_MB: int = 20
 
+    # ── ETAPA A: orquestador conversacional (docs/nueva_arquitectura.md) ──────
+    ORCH_LLM_PROVIDER: str = "openai"          # openai | gemini
+    ORCH_OPENAI_MODEL: str = "gpt-4o-mini"     # rápido y barato para chat hablado
+    ORCH_GEMINI_MODEL: str = "gemini-2.5-flash"
+    ORCH_WHISPER_MODEL: str = "base"           # faster-whisper: tiny|base|small…
+    # Persona del avatar (clon digital) — None usa el prompt por defecto
+    ORCH_SYSTEM_PROMPT: Optional[str] = None
+
     # ── Optional extras (wired up later) ─────────────────────────────────────
     ELEVENLAB_API_KEY: Optional[str] = None
     ENABLE_RUNPOD: bool = False
