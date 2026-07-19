@@ -113,6 +113,13 @@ def _ensure_models() -> None:
         sys.path.insert(0, str(DEPS))
         sys.path.insert(0, str(MUSETALK_ROOT))
         os.chdir(MUSETALK_ROOT)
+        # El stack HF del volumen debe ganar al de la imagen: si algo ya
+        # importó huggingface_hub/transformers desde /usr/local/lib, queda
+        # cacheado en sys.modules y NUESTRO path insert no aplica → purgar.
+        for mod in list(sys.modules):
+            if mod.split(".")[0] in ("huggingface_hub", "transformers",
+                                     "diffusers", "tokenizers", "safetensors"):
+                del sys.modules[mod]
         import torch
         from musetalk.utils.utils import load_all_model
         from musetalk.utils.audio_processor import AudioProcessor
