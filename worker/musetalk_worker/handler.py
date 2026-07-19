@@ -86,6 +86,16 @@ def do_bootstrap() -> dict:
             f"'huggingface_hub==0.25.2' 'tokenizers>=0.13.3,<0.14' 'safetensors>=0.3.1'")
         (DEPS / ".hfstack_v2").touch()
         steps.append("hfstack_v2")
+    if not (DEPS / ".strip_torch").exists():
+        # requirements.txt de MuseTalk metió torch 2.13 (CPU) al volumen via
+        # --target; según qué import gane, se mezcla con el 2.0.1+cu118 de la
+        # imagen (errores pytree intermitentes). El volumen NO lleva torch:
+        # manda siempre el de la imagen.
+        _sh(f"rm -rf {DEPS}/torch {DEPS}/torch-* {DEPS}/torchvision* "
+            f"{DEPS}/torchaudio* {DEPS}/functorch* {DEPS}/nvidia* {DEPS}/triton* "
+            f"{DEPS}/torchgen*")
+        (DEPS / ".strip_torch").touch()
+        steps.append("strip_torch")
     if not (MUSETALK_ROOT / "models/musetalkV15/unet.pth").exists():
         dw = MUSETALK_ROOT / "download_weights.sh"
         if dw.exists():
@@ -171,12 +181,38 @@ def _get_avatar(key: str):
 
 # ── handler ──────────────────────────────────────────────────────────────────
 
+def do_diag() -> dict:
+    """Visibilidad total del volumen: versiones instaladas + resolución real
+    de imports (sin cargar modelos). Para depurar conflictos sin adivinar."""
+    out = {"dist_info": {}, "imports": {}}
+    for d in sorted(DEPS.glob("*.dist-info")):
+        name = d.name.replace(".dist-info", "")
+        out["dist_info"][name.rsplit("-", 1)[0]] = name.rsplit("-", 1)[-1]
+    sys.path.insert(0, str(DEPS))
+    for mod in list(sys.modules):
+        if mod.split(".")[0] in ("huggingface_hub", "transformers", "diffusers",
+                                 "tokenizers", "safetensors", "peft", "accelerate"):
+            del sys.modules[mod]
+    for name in ("torch", "huggingface_hub", "transformers", "diffusers",
+                 "peft", "accelerate", "mmcv", "mmpose"):
+        try:
+            m = __import__(name)
+            out["imports"][name] = {"version": getattr(m, "__version__", "?"),
+                                    "file": getattr(m, "__file__", "?")}
+        except Exception as e:
+            out["imports"][name] = {"error": f"{type(e).__name__}: {e}"[:300]}
+    return out
+
+
 def handler(job):
     inp = job.get("input") or {}
     jt = inp.get("job_type")
     try:
         if jt == "bootstrap":
             return do_bootstrap()
+
+        if jt == "diag":
+            return do_diag()
 
         if jt == "warmup":
             t0 = time.time()
