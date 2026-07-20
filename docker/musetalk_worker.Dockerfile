@@ -13,8 +13,11 @@ FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel-ubuntu22.04
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir runpod \
-    # alinear el hub de la imagen con el del volumen (pins de MuseTalk)
-    && pip install --no-cache-dir "huggingface_hub==0.30.2"
+    # la base trae huggingface_hub 1.24.0 (>=1.0, rompe transformers 4.39 /
+    # diffusers 0.30 que exigen <1.0). Forzar 0.25.2 (compatible, sin
+    # cached_download que diffusers 0.30 ya no usa). --force-reinstall vence
+    # a la version de la base; el volumen no siempre recibe el suyo.
+    && pip install --no-cache-dir --force-reinstall --no-deps "huggingface_hub==0.25.2"
 
 COPY worker/musetalk_worker/handler.py /handler.py
 CMD ["python", "-u", "/handler.py"]

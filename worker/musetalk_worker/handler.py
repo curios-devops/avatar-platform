@@ -88,6 +88,17 @@ def do_bootstrap() -> dict:
             f"'regex' 'requests' 'pyyaml' 'filelock' 'fsspec' 'importlib_metadata'")
         (DEPS / ".hfstack_v3").touch()
         steps.append("hfstack_v3")
+    if not (DEPS / ".hub_v4").exists():
+        # El hub NO aterrizó en el volumen en hfstack_v3 (medido con diag:
+        # dist-info sin huggingface_hub → resolución cae a la imagen). Paso
+        # dedicado con verificación dura de que el paquete quedó en el volumen.
+        _sh(f"rm -rf {DEPS}/huggingface_hub*")
+        _sh(f"pip install --no-cache-dir --target {DEPS} --upgrade --force-reinstall "
+            f"--no-deps 'huggingface_hub==0.25.2'")
+        assert (DEPS / "huggingface_hub" / "__init__.py").exists(), \
+            "huggingface_hub NO quedó en el volumen"
+        (DEPS / ".hub_v4").touch()
+        steps.append("hub_v4")
     if not (DEPS / ".strip_torch").exists():
         # requirements.txt de MuseTalk metió torch 2.13 (CPU) al volumen via
         # --target; según qué import gane, se mezcla con el 2.0.1+cu118 de la
