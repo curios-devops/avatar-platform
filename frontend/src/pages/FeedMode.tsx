@@ -79,6 +79,31 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
   const vidB = useRef<HTMLVideoElement>(null);
   const activeVid = useRef<'a' | 'b'>('a');
   const clipShown = useRef('');
+  const chunkQueue = useRef<string[]>([]);
+  const playingChunk = useRef(false);
+
+  /** A2: reproducir chunks de video con lip-sync en orden; al agotarse,
+   *  volver al loop idle. */
+  const playNextChunk = () => {
+    if (playingChunk.current) return;
+    const url = chunkQueue.current.shift();
+    if (!url) return;
+    playingChunk.current = true;
+    const cur = activeVid.current === 'a' ? vidA.current : vidB.current;
+    const nxt = activeVid.current === 'a' ? vidB.current : vidA.current;
+    if (!cur || !nxt) { playingChunk.current = false; return; }
+    nxt.src = url; nxt.loop = false; nxt.muted = false;
+    nxt.onended = () => {
+      playingChunk.current = false;
+      if (chunkQueue.current.length) playNextChunk();
+      else { clipShown.current = ''; showClip(CLIP_FOR['idle']); setEstado('idle'); setSubtitulo(''); }
+    };
+    nxt.play().then(() => {
+      nxt.style.opacity = '1'; cur.style.opacity = '0';
+      activeVid.current = activeVid.current === 'a' ? 'b' : 'a';
+      clipShown.current = `__chunk__`;
+    }).catch(() => { playingChunk.current = false; });
+  };
 
   const clipUrl = (name: string) => `${serverUrl}/dev-storage/clips/${avatarId}/${name}.mp4`;
 
@@ -111,12 +136,19 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
       if (m.type === 'transcript') { setPregunta(m.text); return; }
       if (m.type === 'error') { console.warn('[feed]', m.detail); return; }
       if (!('estado' in m)) return;
-      if (m.audio_chunk) {
+      if (m.video_chunk) {
+        // A2: chunk MP4 con lip-sync (audio muxeado) — sustituye al loop y
+        // al audio MSE para esta respuesta
+        mseRef.current.stop();
+        chunkQueue.current.push(`${serverUrl}${m.video_chunk}`);
+        if (m.texto_frase) setSubtitulo(m.texto_frase);
+        setEstado('hablando');
+        playNextChunk();
+      } else if (m.audio_chunk) {
         if (m.lat_primer_chunk_ms != null) mseRef.current.start();
         mseRef.current.append(m.audio_chunk);
         setEstado('hablando');
         if (m.texto_frase) setSubtitulo(m.texto_frase);
-        // TODO(A2): sustituir loop por video_chunk con lip-sync
       } else if (m.estado === 'escuchando') {
         setEstado('escuchando');
       } else if (m.estado === 'idle') {
@@ -136,8 +168,9 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
   const enviarTexto = () => {
     if (!texto.trim() || !wsRef.current) return;
     mseRef.current.stop();
+    chunkQueue.current = [];
     setPregunta(texto);
-    wsRef.current.send(JSON.stringify({ type: 'user_text', text: texto }));
+    wsRef.current.send(JSON.stringify({ type: 'user_text', text: texto, avatar_id: avatarId }));
     setTexto('');
     setEstado('pensando');
   };
@@ -167,7 +200,7 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
           fr.onload = () => res((fr.result as string).split(',')[1]);
           fr.readAsDataURL(blob);
         });
-        wsRef.current?.send(JSON.stringify({ type: 'user_audio', audio_b64: b64, mime: 'audio/webm' }));
+        wsRef.current?.send(JSON.stringify({ type: 'user_audio', audio_b64: b64, mime: 'audio/webm', avatar_id: avatarId }));
         setEstado('pensando');
       };
       rec.start();

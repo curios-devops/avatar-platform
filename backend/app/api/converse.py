@@ -43,6 +43,7 @@ async def converse_ws(ws: WebSocket):
             kind = data.get("type")
             if kind == "user_text":
                 session.voice_id = data.get("voice_id") or session.voice_id
+                session.avatar_id = data.get("avatar_id") or session.avatar_id
                 await session.handle_user_text(str(data.get("text", ""))[:2000])
             elif kind == "user_audio":
                 from ..orchestrator.stt import transcribe  # diferido: peso whisper
@@ -56,6 +57,7 @@ async def converse_ws(ws: WebSocket):
                 await ws.send_json({"type": "transcript", "text": text})
                 if text:
                     session.voice_id = data.get("voice_id") or session.voice_id
+                    session.avatar_id = data.get("avatar_id") or session.avatar_id
                     await session.handle_user_text(text)
             elif kind == "interrupt":
                 await session.interrupt()

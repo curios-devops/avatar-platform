@@ -49,6 +49,10 @@ class MensajeContrato(BaseModel):
     texto_frase: Optional[str] = None
 
     # ── metadatos opcionales (no rompen el contrato mínimo) ──────────────
+    # Modo Feed con lip-sync (A2): URL relativa del chunk MP4 H.264 de la
+    # frase (video con el audio ya muxeado). El cliente lo prefiere sobre
+    # audio_chunk cuando llega.
+    video_chunk: Optional[str] = None
     # ms de audio ya emitidos de esta frase antes de este chunk — permite a
     # un cliente re-sincronizar si se pierde un mensaje.
     audio_t0_ms: Optional[int] = None

@@ -86,6 +86,17 @@ def do_bootstrap() -> dict:
             f"'huggingface_hub==0.25.2' 'tokenizers>=0.13.3,<0.14' 'safetensors>=0.3.1'")
         (DEPS / ".hfstack_v2").touch()
         steps.append("hfstack_v2")
+    if not (DEPS / ".hub_vol_2003").exists():
+        # pip --target SALTA huggingface_hub porque ya está en la imagen → el
+        # volumen se queda sin él y la resolución cae a la imagen (sin
+        # cached_download, que diffusers 0.27 importa). --ignore-installed lo
+        # fuerza AL volumen; 0.20.3 sí tiene cached_download y satisface
+        # transformers 4.33 (>=0.15) y diffusers 0.27 (>=0.20.2).
+        _sh(f"rm -rf {DEPS}/huggingface_hub*")
+        _sh(f"pip install --no-cache-dir --target {DEPS} --ignore-installed "
+            f"--no-deps 'huggingface_hub==0.20.3'")
+        (DEPS / ".hub_vol_2003").touch()
+        steps.append("hub_vol_2003")
     if not (DEPS / ".strip_torch").exists():
         # requirements.txt de MuseTalk metió torch 2.13 (CPU) al volumen via
         # --target; según qué import gane, se mezcla con el 2.0.1+cu118 de la
