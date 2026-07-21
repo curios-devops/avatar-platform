@@ -99,8 +99,10 @@ def do_bootstrap() -> dict:
             (lambda: _sh(f"curl -Ls https://download.pytorch.org/models/resnet18-5c106cde.pth "
                          f"-o {MODELS_VOL/'face-parse-bisent'/'resnet18-5c106cde.pth'}")),
         MODELS_VOL / "face-parse-bisent" / "79999_iter.pth":
-            (lambda: _sh(f"gdown --id 154JgKpzCPW82qINcVieuPH3fZ2e0P812 "
-                         f"-O {MODELS_VOL/'face-parse-bisent'/'79999_iter.pth'}")),
+            # el original va por Google Drive (gdown falla: rate-limit/token).
+            # mirror en HF, mismo peso (53 MB) → huggingface-cli, determinista.
+            (lambda: hf("vivym/face-parsing-bisenet", MODELS_VOL / "face-parse-bisent",
+                        ["79999_iter.pth"])),
     }
     for d in ("sd-vae", "whisper", "dwpose", "syncnet", "face-parse-bisent"):
         (MODELS_VOL / d).mkdir(parents=True, exist_ok=True)
