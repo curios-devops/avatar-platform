@@ -69,20 +69,45 @@ def do_bootstrap() -> dict:
     steps = []
     _link_models()
     AVATARS_DIR.mkdir(parents=True, exist_ok=True)
-    # Los pesos vienen de VARIOS repos HF (unet de TMElyralab/MuseTalk, sd-vae
-    # de stabilityai, whisper de openai, dwpose, syncnet, face-parse…).
-    # download_weights.sh los orquesta todos; con hub 0.30.2 el CLI funciona.
-    required = [MODELS_VOL / "musetalkV15" / "unet.pth",
-                MODELS_VOL / "sd-vae" / "config.json",
-                MODELS_VOL / "sd-vae" / "diffusion_pytorch_model.bin",
-                MODELS_VOL / "whisper" / "config.json",
-                MODELS_VOL / "dwpose" / "dw-ll_ucoco_384.pth"]
-    missing = [str(p.relative_to(MODELS_VOL)) for p in required if not p.exists()]
-    if missing:
-        dw = MUSETALK_ROOT / "download_weights.sh"
-        assert dw.exists(), "download_weights.sh no está en el repo"
-        _sh(f"cd {MUSETALK_ROOT} && bash download_weights.sh")
-        steps.append("weights")
+    # Pesos de VARIOS repos HF. NO usamos download_weights.sh: fija
+    # HF_ENDPOINT=hf-mirror.com (espejo chino, falla desde US) y hace
+    # `pip -U huggingface_hub` (re-rompe el hub a >=1.0). Replicamos con el
+    # endpoint por defecto y sin tocar pip.
+    env = "HF_ENDPOINT=https://huggingface.co"
+
+    def hf(repo: str, local: Path, includes: list[str]):
+        inc = " ".join(f'"{i}"' for i in includes)
+        _sh(f"{env} huggingface-cli download {repo} --local-dir {local} --include {inc}")
+
+    required = {
+        MODELS_VOL / "musetalkV15" / "unet.pth":
+            (lambda: hf("TMElyralab/MuseTalk", MODELS_VOL,
+                        ["musetalkV15/musetalk.json", "musetalkV15/unet.pth",
+                         "musetalk/musetalk.json", "musetalk/pytorch_model.bin"])),
+        MODELS_VOL / "sd-vae" / "config.json":
+            (lambda: hf("stabilityai/sd-vae-ft-mse", MODELS_VOL / "sd-vae",
+                        ["config.json", "diffusion_pytorch_model.bin"])),
+        MODELS_VOL / "whisper" / "config.json":
+            (lambda: hf("openai/whisper-tiny", MODELS_VOL / "whisper",
+                        ["config.json", "pytorch_model.bin", "preprocessor_config.json"])),
+        MODELS_VOL / "dwpose" / "dw-ll_ucoco_384.pth":
+            (lambda: hf("yzd-v/DWPose", MODELS_VOL / "dwpose", ["dw-ll_ucoco_384.pth"])),
+        MODELS_VOL / "syncnet" / "latentsync_syncnet.pt":
+            (lambda: hf("ByteDance/LatentSync", MODELS_VOL / "syncnet",
+                        ["latentsync_syncnet.pt"])),
+        MODELS_VOL / "face-parse-bisent" / "resnet18-5c106cde.pth":
+            (lambda: _sh(f"curl -Ls https://download.pytorch.org/models/resnet18-5c106cde.pth "
+                         f"-o {MODELS_VOL/'face-parse-bisent'/'resnet18-5c106cde.pth'}")),
+        MODELS_VOL / "face-parse-bisent" / "79999_iter.pth":
+            (lambda: _sh(f"gdown --id 154JgKpzCPW82qINcVieuPH3fZ2e0P812 "
+                         f"-O {MODELS_VOL/'face-parse-bisent'/'79999_iter.pth'}")),
+    }
+    for d in ("sd-vae", "whisper", "dwpose", "syncnet", "face-parse-bisent"):
+        (MODELS_VOL / d).mkdir(parents=True, exist_ok=True)
+    for target, download in required.items():
+        if not target.exists() or target.stat().st_size < 1000:
+            download()
+            steps.append(target.parent.name)
     still_missing = [str(p.relative_to(MODELS_VOL)) for p in required if not p.exists()]
     size_gb = round(sum(p.stat().st_size for p in MODELS_VOL.rglob('*') if p.is_file()) / 1e9, 1)
     return {"bootstrapped": steps or ["noop"], "weights_ok": not still_missing,

@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # mmlab con wheels precompiladas cu118/torch2.0 vía openmim
 RUN pip install --no-cache-dir -U openmim \
     && mim install "mmengine" "mmcv==2.0.1" "mmdet==3.1.0" "mmpose==1.1.0"
-RUN pip install --no-cache-dir runpod
+RUN pip install --no-cache-dir runpod gdown
 # Guarda de determinismo: si alguna dep pisó el torch cu118 de la base, restaurar
 RUN python -c "import torch,sys; sys.exit(0 if torch.version.cuda else 1)" \
     || pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2 \
