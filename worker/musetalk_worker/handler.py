@@ -69,19 +69,25 @@ def do_bootstrap() -> dict:
     steps = []
     _link_models()
     AVATARS_DIR.mkdir(parents=True, exist_ok=True)
-    unet = MODELS_VOL / "musetalkV15" / "unet.pth"
-    if not unet.exists() or unet.stat().st_size < 1_000_000:
-        # descarga robusta: el repo HF completo al volumen (via symlink models).
-        # download_weights.sh depende de flags que cambian con el hub; el
-        # download directo es determinista.
-        _sh(f"huggingface-cli download TMElyralab/MuseTalk "
-            f"--local-dir {MODELS_VOL} --local-dir-use-symlinks False")
+    # Los pesos vienen de VARIOS repos HF (unet de TMElyralab/MuseTalk, sd-vae
+    # de stabilityai, whisper de openai, dwpose, syncnet, face-parse…).
+    # download_weights.sh los orquesta todos; con hub 0.30.2 el CLI funciona.
+    required = [MODELS_VOL / "musetalkV15" / "unet.pth",
+                MODELS_VOL / "sd-vae" / "config.json",
+                MODELS_VOL / "sd-vae" / "diffusion_pytorch_model.bin",
+                MODELS_VOL / "whisper" / "config.json",
+                MODELS_VOL / "dwpose" / "dw-ll_ucoco_384.pth"]
+    missing = [str(p.relative_to(MODELS_VOL)) for p in required if not p.exists()]
+    if missing:
+        dw = MUSETALK_ROOT / "download_weights.sh"
+        assert dw.exists(), "download_weights.sh no está en el repo"
+        _sh(f"cd {MUSETALK_ROOT} && bash download_weights.sh")
         steps.append("weights")
-    ok = unet.exists() and unet.stat().st_size > 1_000_000
+    still_missing = [str(p.relative_to(MODELS_VOL)) for p in required if not p.exists()]
     size_gb = round(sum(p.stat().st_size for p in MODELS_VOL.rglob('*') if p.is_file()) / 1e9, 1)
-    return {"bootstrapped": steps or ["noop"], "weights_ok": ok,
-            "unet_mb": round(unet.stat().st_size / 1e6, 1) if unet.exists() else 0,
-            "models_gb": size_gb, "seconds": round(time.time() - t0, 1)}
+    return {"bootstrapped": steps or ["noop"], "weights_ok": not still_missing,
+            "missing": still_missing, "models_gb": size_gb,
+            "seconds": round(time.time() - t0, 1)}
 
 
 def do_diag() -> dict:
