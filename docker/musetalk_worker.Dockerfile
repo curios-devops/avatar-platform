@@ -31,6 +31,12 @@ RUN pip install --no-cache-dir runpod
 RUN python -c "import torch,sys; sys.exit(0 if torch.version.cuda else 1)" \
     || pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2 \
        --index-url https://download.pytorch.org/whl/cu118
+# ÚLTIMO paso: runpod (arriba) sube huggingface_hub a 1.24.0 (>=1.0, rompe
+# transformers 4.39/diffusers 0.30 Y el huggingface-cli de descarga). Fijarlo
+# al pin de MuseTalk como paso final, --no-deps para no tocar nada más.
+RUN pip install --no-cache-dir --force-reinstall --no-deps "huggingface_hub==0.30.2" \
+    && python -c "import huggingface_hub as h; print('hub', h.__version__); \
+import transformers, diffusers; print('transformers', transformers.__version__, 'diffusers', diffusers.__version__)"
 
 COPY worker/musetalk_worker/handler.py /opt/MuseTalk/rp_handler.py
 CMD ["python", "-u", "/opt/MuseTalk/rp_handler.py"]
