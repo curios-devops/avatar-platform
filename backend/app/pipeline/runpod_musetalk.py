@@ -56,11 +56,16 @@ class RunPodMuseTalkClient:
         return await self._run({"job_type": "warmup"}, max_wait_s=900)
 
     async def prepare_avatar(self, avatar_id: str, clips: dict[str, bytes]) -> dict:
-        payload = {
-            "job_type": "prepare_avatar", "avatar_id": avatar_id,
-            "clips": {n: base64.b64encode(b).decode() for n, b in clips.items()},
-        }
-        return await self._run(payload, max_wait_s=1800)
+        # Un clip por request: el /run síncrono de RunPod limita el payload
+        # (~10 MB) y 5 clips en base64 lo exceden.
+        prepared = []
+        for name, data in clips.items():
+            out = await self._run({
+                "job_type": "prepare_avatar", "avatar_id": avatar_id,
+                "clips": {name: base64.b64encode(data).decode()},
+            }, max_wait_s=1800)
+            prepared += out.get("prepared", [])
+        return {"prepared": prepared}
 
     async def speak(self, avatar_id: str, gesto: str, audio: bytes,
                     audio_mime: str = "audio/mpeg") -> bytes:

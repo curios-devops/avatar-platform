@@ -161,8 +161,17 @@ def _ensure_models() -> None:
         whisper = WhisperModel.from_pretrained("models/whisper")
         whisper = whisper.to(device="cuda", dtype=torch.float16).eval()
         whisper.requires_grad_(False)
+        # globals que realtime_inference.py monta en su bloque __main__ y que
+        # la clase Avatar referencia (fp/weight_dtype/timesteps/device). Sin
+        # ellos: NameError 'fp' en prepare_material.
+        from musetalk.utils.face_parsing import FaceParsing
+        device = torch.device("cuda")
         _models.update(vae=vae, unet=unet, pe=pe,
-                       audio_processor=audio_processor, whisper=whisper)
+                       audio_processor=audio_processor, whisper=whisper,
+                       device=device,
+                       timesteps=torch.tensor([0], device=device),
+                       weight_dtype=unet.model.dtype,
+                       fp=FaceParsing(left_cheek_width=90, right_cheek_width=90))
         logger.info("modelos residentes en %.1fs", time.time() - t0)
     except Exception:
         _MODELS_ERR = traceback.format_exc()
