@@ -50,8 +50,18 @@ async def _sync_lam_idle_timeout() -> None:
 # Dev-only: serve local artifact files at /dev-storage/
 if settings.DEV_STORAGE:
     import pathlib
+    import shutil
     dev_root = pathlib.Path("/tmp/avatar-dev")
     dev_root.mkdir(parents=True, exist_ok=True)
+    # macOS limpia /tmp: re-sembrar los clips demo del Feed al arrancar
+    _demo_src = pathlib.Path(__file__).resolve().parents[2] / ".triage" / "clips" / "prepped"
+    _demo_dst = dev_root / "clips" / "demo"
+    if _demo_src.exists():
+        _demo_dst.mkdir(parents=True, exist_ok=True)
+        for _c in ("idle_a", "idle_b", "listen", "gesture_enum", "gesture_open"):
+            _f = _demo_src / f"{_c}.mp4"
+            if _f.exists() and not (_demo_dst / _f.name).exists():
+                shutil.copy(_f, _demo_dst / _f.name)
     app.mount("/dev-storage", StaticFiles(directory=str(dev_root)), name="dev-storage")
 
 

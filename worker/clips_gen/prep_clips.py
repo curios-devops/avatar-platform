@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -71,12 +72,19 @@ def normalize_colors(clips: dict[str, Path], out_dir: Path, ref_name: str = "idl
             continue
         frames, fps = read_frames(path)
         h, w = frames[0].shape[:2]
-        vw = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+        # cv2 mp4v = MPEG-4 Part 2, que los navegadores RECHAZAN. Escribir a un
+        # tmp y transcodificar a H.264 web-safe con ffmpeg.
+        tmp = out.with_suffix(".mp4v.mp4")
+        vw = cv2.VideoWriter(str(tmp), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
         for f in frames:
             vw.write(match_color(f, ref_stats))
         vw.release()
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(tmp),
+                        "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                        "-movflags", "+faststart", str(out)], check=True)
+        tmp.unlink()
         normalized[name] = out
-        print(f"[color] {name} normalizado → {out}")
+        print(f"[color] {name} normalizado (H.264) → {out}")
     return normalized
 
 

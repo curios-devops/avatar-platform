@@ -17,6 +17,7 @@ import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ..config import settings
 from ..orchestrator.contract import MensajeContrato
 from ..orchestrator.session import ConversationSession
 
@@ -37,6 +38,23 @@ async def converse_ws(ws: WebSocket):
 
     session = ConversationSession(session_id, emit)
     logger.info("[%s] sesión conversacional abierta", session_id)
+
+    # Calentar el worker MuseTalk en cuanto se abre la sesión (fire-and-forget):
+    # el modelo carga (~16 s en frío) mientras el usuario escribe/habla, para que
+    # el primer speak sea ~5 s y no ~14 s.
+    if settings.RUNPOD_MUSETALK_ENDPOINT_ID:
+        async def _warm():
+            try:
+                import httpx as _hx
+                async with _hx.AsyncClient(timeout=10) as _c:
+                    await _c.post(
+                        f"https://api.runpod.ai/v2/{settings.RUNPOD_MUSETALK_ENDPOINT_ID}/run",
+                        json={"input": {"job_type": "warmup"}},
+                        headers={"Authorization": f"Bearer {settings.RUNPOD_API_KEY}"})
+            except Exception:
+                pass
+        import asyncio as _a
+        _a.create_task(_warm())
     try:
         while True:
             data = await ws.receive_json()
