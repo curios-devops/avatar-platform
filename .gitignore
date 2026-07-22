@@ -46,3 +46,6 @@ backend/data/
 
 workspace/
 temp/
+
+# QA harness renders (regenerables con qa/run_all.sh)
+qa/out/

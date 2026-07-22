@@ -1,0 +1,25 @@
+{
+  "_comment": "Barrido FIJO y versionado del harness QA de la Etapa B (docs/nueva_arquitectura.md QA1). NUNCA cambiar sin re-aprobar los gates: es la referencia contra la que se comparan todas las iteraciones. Convención LAM: eje +Z frontal canónico (memoria project_lam_migration), +Y arriba. yaw = rotación alrededor de +Y (grados, + = mira a su izquierda), pitch = alrededor de +X (+ = mira arriba). La cámara orbita mirando al centro del busto.",
+  "up": [0.0, 1.0, 0.0],
+  "fov_deg": 30.0,
+  "image": { "width": 512, "height": 512 },
+  "background": [0, 0, 0],
+  "distances": {
+    "medio_cuerpo": 3.2,
+    "primer_plano": 1.7
+  },
+  "sweep": [
+    { "name": "yaw-45",  "yaw": -45, "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "yaw-30",  "yaw": -30, "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "yaw-15",  "yaw": -15, "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "front",   "yaw": 0,   "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "yaw+15",  "yaw": 15,  "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "yaw+30",  "yaw": 30,  "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "yaw+45",  "yaw": 45,  "pitch": 0,   "dist": "medio_cuerpo" },
+    { "name": "pitch-10","yaw": 0,   "pitch": -10, "dist": "medio_cuerpo" },
+    { "name": "pitch+10","yaw": 0,   "pitch": 10,  "dist": "medio_cuerpo" },
+    { "name": "cara-front", "yaw": 0,   "pitch": 0, "dist": "primer_plano" },
+    { "name": "cara-yaw+30","yaw": 30,  "pitch": 0, "dist": "primer_plano" },
+    { "name": "cara-yaw-30","yaw": -30, "pitch": 0, "dist": "primer_plano" }
+  ]
+}

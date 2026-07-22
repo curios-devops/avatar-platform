@@ -235,3 +235,108 @@ idle_a y listen + A2 con chunks MP4 + player básico.
 Comandos exactos, VRAM por paso, latencias medidas, y limitaciones
 conocidas (A: suavidad bucal en primeros planos extremos;
 B: manos borrosas, espalda alucinada, ropa rígida, boca aproximada).
+
+# Actualización Etapa B — Harness de QA visual y autocorrección
+# Agente: Claude Opus 4.8 / Fable (Claude Code)
+# Estado: B1, B1.5, B2, B3, B4 YA implementados. Esta tarea NO añade
+# features nuevas: añade la disciplina de revisión visual con gates
+# (patrón build → render → inspección → gate → autocorrección) sobre
+# lo que ya existe, y re-valida cada fase con ese harness.
+
+## Principios (aplican a TODO lo que sigue)
+1. **Scripts deterministas hacen el trabajo mecánico; el agente solo
+   juzga.** Renderizar, medir, empaquetar y registrar es código Python
+   sin intervención del modelo. Los tokens de visión se gastan en una
+   sola cosa: mirar UNA hoja comparativa por ciclo y decidir.
+2. **Una hoja por revisión.** Cada ciclo de revisión produce exactamente
+   una imagen lado-a-lado empaquetada. Prohibido evaluar desde
+   screenshots sueltos dispersos en la conversación.
+3. **Gates bloqueantes.** Ninguna fase se declara "pasada" sin: render
+   real + hoja comparativa + métricas + score de visión ≥ umbral.
+   "Corrió sin errores" NO es criterio de éxito.
+4. **Autocorrección acotada.** Tras cada revisión fallida, elegir UNA
+   acción: `refine-params` (ajustar umbrales/configs), `refine-code`
+   (bug real), `request-input` (decisión humana: enseñar la hoja y
+   preguntar), o `stop` (límite alcanzado, documentar). Máximo 6 ciclos
+   por gate; al sexto fallo → `request-input` obligatorio.
+
+## Fase QA0 — Auditoría del estado actual
+1. Inventariar la implementación existente de B1→B4: qué scripts hay,
+   qué corren, qué artefactos producen (paths reales de .ply/.spz/
+   rig.json), y qué criterios de aceptación se validaron manualmente
+   vs no se validaron.
+2. Emitir `reports/qa0_audit.md`: tabla fase × artefacto × "validado
+   con evidencia sí/no". NO arreglar nada todavía.
+✅ Gate: el audit lista al menos un hueco de validación o declara
+   explícitamente que no hay ninguno (con evidencia enlazada).
+
+## Fase QA1 — Scripts deterministas del harness (`qa/`)
+Todos en Python, sin dependencias exóticas (torch/opencv/insightface
+permitidos; nada que requiera GPU salvo el render).
+1. `render_sweep.py` — renderiza el avatar (headless: usar el mismo
+   runtime Spark en un browser headless con Playwright, o un
+   rasterizador 3DGS offline) en un barrido FIJO y versionado de
+   cámaras: yaw {-45,-30,-15,0,+15,+30,+45}, pitch {-10,0,+10},
+   2 distancias (medio cuerpo, primer plano cara). Mismas cámaras
+   SIEMPRE, definidas en `qa/cameras.json`.
+2. `make_sheet.py` — empaqueta UNA hoja PNG: fila superior =
+   referencia (foto original + vistas B1.5), fila inferior = renders
+   del sweep, con etiquetas de ángulo y las métricas impresas al pie.
+3. `metrics.py` — calcula y emite `metrics.json`:
+   - identidad: ArcFace coseno vs foto original, por ángulo
+   - huecos: % de píxeles de fondo visibles a través del splat
+     dentro de la silueta esperada (proxy de agujeros), por ángulo
+   - costura: gradiente de color medio en la banda del cuello vs
+     gradiente medio del resto del busto (ratio; >1.5 = costura visible)
+   - runtime (solo B3): FPS p50/p5 en 10 s de órbita automatizada,
+     desfase audio-labios medido con la frase de prueba de A0
+4. `review.py` — registra cada ciclo en `reports/reviews.jsonl`:
+   {gate, ciclo, métricas, score_visión, decisión, acción, notas}.
+✅ Gate: los 4 scripts corren end-to-end sobre el avatar ya generado
+   y producen hoja + métricas sin intervención manual.
+
+## Fase QA2 — Definición de gates por fase (con umbrales iniciales)
+Crear `qa/gates.json` con estos umbrales (ajustables vía
+`refine-params`, nunca silenciosamente):
+- **GATE-B1.5 (oclusiones):** huecos < 1% en |yaw| ≤ 45°;
+  ArcFace frontal ≥ (valor LAM-sin-refinar − 0.02); score visión ≥ 7/10
+  con pregunta explícita: "¿mismos rasgos, peinado y tono en todas
+  las vistas?"
+- **GATE-B2 (fusión):** ratio de costura < 1.5; cero splats flotantes
+  visibles en la hoja; score visión ≥ 7/10 en primer plano del cuello.
+- **GATE-B3 (runtime):** FPS p5 ≥ 30 en el dispositivo de referencia;
+  desfase audio-labios < 100 ms; sin pop de LoD perceptible en el
+  video del zoom (adjuntar 3 frames del zoom a la hoja).
+- **GATE-B4 (UX/transiciones):** entrar/salir del modo 3D a mitad de
+  frase sin pérdida de audio (log del orquestador como evidencia) +
+  score visión de la transición ≥ 7/10.
+El score de visión lo emite el agente mirando SOLO la hoja del ciclo,
+y queda registrado con justificación de una línea por criterio.
+
+## Fase QA3 — Re-validación de lo ya implementado
+1. Correr los gates en orden: B1.5 → B2 → B3 → B4, con el flujo de
+   autocorrección del Principio 4.
+2. Por cada gate: guardar la hoja final aprobada en
+   `reports/approved/{gate}.png` y el diff de qué se cambió (si hubo
+   refine-code/params) en el reporte.
+3. Producto final: `reports/qa_summary.md` — tabla de gates, ciclos
+   consumidos, métricas finales vs umbral, y lista de limitaciones
+   aceptadas (p. ej. "pelo lateral blando en +45°, aceptado ciclo 4").
+✅ Gate final: los 4 gates en verde, o en `request-input` con su hoja
+   y una recomendación concreta para decisión humana.
+
+## Fase QA4 — Integración continua ligera
+1. `qa/run_all.sh` — un comando que ejecuta sweep + hoja + métricas +
+   gates para un avatar dado. Debe terminar en < 15 min en la GPU
+   offline.
+2. Regla de proceso: cualquier cambio futuro a B1-B4 (código o
+   parámetros) exige re-correr `run_all.sh` y adjuntar la hoja nueva
+   antes de mergear. Documentarlo en el README de la Etapa B.
+✅ Gate: ejecutar run_all.sh dos veces seguidas da métricas estables
+   (variación < 5%), demostrando que el harness es determinista.
+
+## Fuera de alcance (NO hacer)
+- No tocar la Etapa A (el híbrido tiene su propia validación).
+- No perseguir consistencia perfecta entre vistas sintéticas de B1.5
+  (limitación conocida y aceptada).
+- No añadir dependencias de servicios externos al harness.

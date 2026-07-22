@@ -1,0 +1,32 @@
+{
+  "_comment": "QA2 — umbrales de gates de la Etapa B (docs/nueva_arquitectura.md). Ajustables SOLO vía refine-params y registrando el cambio en reports/reviews.jsonl (nunca silenciosamente). arcface_baseline_lam se rellena con el valor de la cabeza LAM SIN refinar la primera vez que corre el harness; el gate de B1.5 es relativo a él.",
+  "GATE-B1.5": {
+    "descripcion": "Oclusiones: el splat de cabeza rota ±45° yaw / ±10° pitch sin huecos ni líneas negras; identidad frontal intacta.",
+    "holes_max_within45_pct": 1.0,
+    "arcface_front_min_delta": -0.02,
+    "arcface_baseline_lam": 0.227,
+    "vision_score_min": 7,
+    "vision_question": "¿mismos rasgos, peinado y tono de piel en todas las vistas? ¿sin líneas negras/huecos/splats flotantes en |yaw|<=45?"
+  },
+  "GATE-B2": {
+    "descripcion": "Fusión cabeza-cuerpo sin costura visible ni splats flotantes.",
+    "seam_ratio_max": 1.5,
+    "floating_splats_allowed": 0,
+    "vision_score_min": 7,
+    "vision_question": "¿se ve la costura del cuello en primer plano? ¿splats flotantes?"
+  },
+  "GATE-B3": {
+    "descripcion": "Runtime Spark: fluidez y sincronía en el dispositivo de referencia.",
+    "fps_p5_min": 30,
+    "audio_lip_offset_ms_max": 100,
+    "lod_pop_allowed": false,
+    "vision_score_min": 7,
+    "vision_question": "¿pop de LoD perceptible al hacer zoom a la cara? (3 frames del zoom en la hoja)"
+  },
+  "GATE-B4": {
+    "descripcion": "UX/transiciones: entrar/salir del modo 3D a mitad de frase sin perder audio ni estado.",
+    "audio_dropout_allowed": false,
+    "vision_score_min": 7,
+    "vision_question": "¿la transición Feed<->3D es limpia (corte/fade <=300ms, misma pose frontal)?"
+  }
+}
