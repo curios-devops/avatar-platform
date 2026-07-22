@@ -12,10 +12,14 @@ para que el cliente pinte la pregunta (A4) — no forma parte del contrato.
 from __future__ import annotations
 
 import base64
+import glob
 import logging
+import subprocess
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 
 from ..config import settings
 from ..orchestrator.contract import MensajeContrato
@@ -26,6 +30,27 @@ router = APIRouter(prefix="/converse", tags=["converse"])
 
 _MIME_SUFFIX = {"audio/webm": ".webm", "audio/ogg": ".ogg",
                 "audio/mp4": ".mp4", "audio/mpeg": ".mp3", "audio/wav": ".wav"}
+
+
+@router.get("/share/{session_id}")
+async def share_response(session_id: str):
+    """A4 — concatena los video_chunk de la última respuesta en un solo MP4
+    para compartir/exportar (ya renderizado; solo un concat sin re-encode)."""
+    safe = "".join(c for c in session_id if c.isalnum())
+    sess_dir = Path("/tmp/avatar-dev/speak") / safe
+    chunks = sorted(glob.glob(str(sess_dir / "*.mp4")))
+    if not chunks:
+        raise HTTPException(404, "sin clips para esta sesión")
+    out = sess_dir / "shared.mp4"
+    if len(chunks) == 1:
+        out = Path(chunks[0])
+    else:
+        listf = sess_dir / "concat.txt"
+        listf.write_text("".join(f"file '{c}'\n" for c in chunks))
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat",
+                        "-safe", "0", "-i", str(listf), "-c", "copy",
+                        "-movflags", "+faststart", str(out)], check=True)
+    return FileResponse(str(out), media_type="video/mp4", filename="mi-avatar.mp4")
 
 
 @router.websocket("/ws")

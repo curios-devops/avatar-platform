@@ -81,6 +81,9 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
   const clipShown = useRef('');
   const chunkQueue = useRef<string[]>([]);
   const playingChunk = useRef(false);
+  const lastResponse = useRef<string[]>([]);   // urls de los chunks de la última respuesta (repetir/compartir)
+  const [zoom, setZoom] = useState(1);          // zoom digital 1-2x (A4)
+  const [canShare, setCanShare] = useState(false);
 
   /** A2: reproducir chunks de video con lip-sync en orden; al agotarse,
    *  volver al loop idle. */
@@ -140,7 +143,10 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
         // A2: chunk MP4 con lip-sync (audio muxeado) — sustituye al loop y
         // al audio MSE para esta respuesta
         mseRef.current.stop();
-        chunkQueue.current.push(`${serverUrl}${m.video_chunk}`);
+        const url = `${serverUrl}${m.video_chunk}`;
+        chunkQueue.current.push(url);
+        lastResponse.current.push(url);
+        setCanShare(true);
         if (m.texto_frase) setSubtitulo(m.texto_frase);
         setEstado('hablando');
         playNextChunk();
@@ -169,6 +175,8 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
     if (!texto.trim() || !wsRef.current) return;
     mseRef.current.stop();
     chunkQueue.current = [];
+    lastResponse.current = [];
+    setCanShare(false);
     setPregunta(texto);
     wsRef.current.send(JSON.stringify({ type: 'user_text', text: texto, avatar_id: avatarId }));
     setTexto('');
@@ -210,18 +218,77 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
   };
   const micUp = () => { recRef.current?.stop(); recRef.current = null; setRecording(false); };
 
+  // ── A4: zoom digital (pellizco/scroll), máx 2x, NUNCA cambia de renderer ──
+  const pinch = useRef<number | null>(null);
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setZoom(z => Math.min(2, Math.max(1, z - e.deltaY * 0.002)));
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 2) return;
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                         e.touches[0].clientY - e.touches[1].clientY);
+    if (pinch.current != null) setZoom(z => Math.min(2, Math.max(1, z * (d / pinch.current!))));
+    pinch.current = d;
+  };
+  const onTouchEnd = () => { pinch.current = null; };
+  const onDouble = () => setZoom(1);   // doble tap/click = reset
+
+  // ── A4: repetir la última respuesta (re-encola sus chunks) ──
+  const repetir = () => {
+    if (!lastResponse.current.length) return;
+    mseRef.current.stop();
+    chunkQueue.current = [...lastResponse.current];
+    setEstado('hablando');
+    playNextChunk();
+  };
+
+  // ── A4: compartir/exportar el clip de la respuesta (ya renderizado) ──
+  const compartir = async () => {
+    if (!lastResponse.current.length) return;
+    // pedir al backend la respuesta concatenada en un solo MP4
+    const session = lastResponse.current[0].split('/speak/')[1]?.split('/')[0];
+    if (!session) return;
+    const url = `${serverUrl}/api/v1/converse/share/${session}`;
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const file = new File([blob], 'mi-avatar.mp4', { type: 'video/mp4' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Mi avatar' });
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'mi-avatar.mp4'; a.click();
+      }
+    } catch (e) { console.warn('compartir:', e); }
+  };
+
   const chip = { idle: '', pensando: 'Pensando…', escuchando: 'Escuchando…', hablando: '' }[estado];
 
   return (
     <div style={S.wrap}>
-      <div style={S.stage}>
-        <video ref={vidA} style={{ ...S.video, opacity: 1 }} playsInline />
-        <video ref={vidB} style={{ ...S.video, opacity: 0 }} playsInline />
+      <div style={S.stage} onWheel={onWheel} onTouchMove={onTouchMove}
+           onTouchEnd={onTouchEnd} onDoubleClick={onDouble}>
+        {/* zoom digital: escala el par de vídeos, nunca cambia de renderer */}
+        <div style={{ position: 'absolute', inset: 0, transform: `scale(${zoom})`,
+                      transition: pinch.current ? 'none' : 'transform 150ms', transformOrigin: 'center 40%' }}>
+          <video ref={vidA} style={{ ...S.video, opacity: 1 }} playsInline />
+          <video ref={vidB} style={{ ...S.video, opacity: 0 }} playsInline />
+        </div>
         {pregunta && <div style={S.question}>{pregunta}</div>}
         {chip && <div style={S.chip}>{chip}</div>}
         {subtitulo && <div style={S.subtitle}>{subtitulo}</div>}
         {onBack && <button style={S.back} onClick={onBack}>←</button>}
+        {zoom > 1.02 && <button style={S.zoomReset} onClick={onDouble}>{zoom.toFixed(1)}× ✕</button>}
         {!wsUp && <div style={S.offline}>conectando…</div>}
+
+        {/* barra de acciones (A4) */}
+        <div style={S.actions}>
+          <button style={S.action} onClick={repetir} disabled={!canShare} title="Repetir respuesta">↺</button>
+          <button style={S.action} onClick={compartir} disabled={!canShare} title="Compartir clip">⤴</button>
+          <button style={{ ...S.action, ...S.action3d }} disabled
+                  title="Ver en 3D — próximamente">⬚</button>
+        </div>
       </div>
       <div style={S.controls}>
         <input
@@ -258,6 +325,12 @@ const S: Record<string, React.CSSProperties> = {
   back: { position: 'absolute', top: 12, left: 12, background: 'rgba(0,0,0,0.5)', color: '#fff',
           border: 'none', borderRadius: 10, width: 34, height: 34, fontSize: 16, cursor: 'pointer' },
   offline: { position: 'absolute', top: 12, right: 12, color: '#f87171', fontSize: 12 },
+  zoomReset: { position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.55)', color: '#fff',
+               border: 'none', borderRadius: 12, padding: '4px 10px', fontSize: 12, cursor: 'pointer' },
+  actions: { position: 'absolute', right: 12, bottom: 60, display: 'flex', flexDirection: 'column', gap: 10 },
+  action: { width: 44, height: 44, borderRadius: '50%', border: 'none', fontSize: 18, cursor: 'pointer',
+            background: 'rgba(0,0,0,0.55)', color: '#fff', backdropFilter: 'blur(6px)' },
+  action3d: { opacity: 0.4, cursor: 'not-allowed' },
   controls: { display: 'flex', gap: 10, alignItems: 'center', padding: '12px 16px',
               width: 'min(100vw, 480px)' },
   input: { flex: 1, background: '#1a1a1e', color: '#eee', border: '1px solid #333',
