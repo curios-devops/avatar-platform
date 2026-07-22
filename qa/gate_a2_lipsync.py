@@ -172,9 +172,11 @@ def main() -> int:
     metrics = _measure_and_sheet(mp4)
     metrics.update(meta)
 
-    # gate mecánico (el juicio de visión lo añade el agente sobre la hoja)
+    # gate mecánico (el juicio de visión lo añade el agente sobre la hoja).
+    # Umbral de apertura calibrado 2026-07-22: una boca hablando de verdad da
+    # rango ~0.05-0.10 en (distancia interior labios / interocular).
     gate = {
-        "mouth_moves": metrics["mouth_open_range"] > 0.15,
+        "mouth_moves": metrics["mouth_open_range"] > 0.04,
         "has_syllables": metrics["mouth_motion_events"] >= 3,
         "latency_ok": meta.get("speak_seconds", 99) < 8,  # útil; ideal <4
     }

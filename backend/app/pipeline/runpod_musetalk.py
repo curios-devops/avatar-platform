@@ -29,16 +29,36 @@ class RunPodMuseTalkClient:
         self.base = f"https://api.runpod.ai/v2/{self.endpoint_id}"
         self.headers = {"Authorization": f"Bearer {settings.RUNPOD_API_KEY}"}
 
-    async def _run(self, payload: dict, max_wait_s: int = _MAX_WAIT_S) -> dict:
-        async with httpx.AsyncClient(timeout=60) as c:
-            r = await c.post(f"{self.base}/run", json={"input": payload}, headers=self.headers)
+    async def _runsync(self, payload: dict, timeout_s: int = 90) -> dict:
+        """Camino de baja latencia: /runsync bloquea y devuelve al terminar,
+        sin el granularidad del polling (para speak, jobs cortos)."""
+        async with httpx.AsyncClient(timeout=timeout_s + 10) as c:
+            r = await c.post(f"{self.base}/runsync", json={"input": payload},
+                             headers=self.headers, timeout=timeout_s + 10)
             r.raise_for_status()
-            jid = r.json()["id"]
+            d = r.json()
+            if d.get("status") == "COMPLETED":
+                out = d.get("output") or {}
+                if out.get("error"):
+                    raise RuntimeError(f"musetalk job error: {out['error'][:500]}")
+                return out
+            if d.get("status") in ("FAILED", "CANCELLED", "TIMED_OUT"):
+                raise RuntimeError(f"musetalk job {d.get('status')}: {str(d.get('error'))[:500]}")
+            # /runsync devolvió IN_PROGRESS (excedió su ventana) → caer a polling
+            return await self._run(payload, max_wait_s=_MAX_WAIT_S, _jid=d.get("id"))
+
+    async def _run(self, payload: dict, max_wait_s: int = _MAX_WAIT_S,
+                   _jid: str | None = None) -> dict:
+        async with httpx.AsyncClient(timeout=60) as c:
+            if _jid is None:
+                r = await c.post(f"{self.base}/run", json={"input": payload}, headers=self.headers)
+                r.raise_for_status()
+                _jid = r.json()["id"]
             waited = 0.0
             while waited < max_wait_s:
                 await asyncio.sleep(_POLL_S)
                 waited += _POLL_S
-                s = await c.get(f"{self.base}/status/{jid}", headers=self.headers)
+                s = await c.get(f"{self.base}/status/{_jid}", headers=self.headers)
                 d = s.json()
                 if d.get("status") == "COMPLETED":
                     out = d.get("output") or {}
@@ -47,7 +67,7 @@ class RunPodMuseTalkClient:
                     return out
                 if d.get("status") in ("FAILED", "CANCELLED", "TIMED_OUT"):
                     raise RuntimeError(f"musetalk job {d.get('status')}: {str(d.get('error'))[:500]}")
-            raise TimeoutError(f"musetalk job {jid} no completó en {max_wait_s}s")
+            raise TimeoutError(f"musetalk job {_jid} no completó en {max_wait_s}s")
 
     async def bootstrap(self) -> dict:
         return await self._run({"job_type": "bootstrap"}, max_wait_s=3000)
@@ -69,7 +89,7 @@ class RunPodMuseTalkClient:
 
     async def speak(self, avatar_id: str, gesto: str, audio: bytes,
                     audio_mime: str = "audio/mpeg") -> bytes:
-        out = await self._run({
+        out = await self._runsync({
             "job_type": "speak", "avatar_id": avatar_id, "gesto": gesto,
             "audio_b64": base64.b64encode(audio).decode(), "audio_mime": audio_mime,
         })
