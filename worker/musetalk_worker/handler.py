@@ -79,7 +79,7 @@ def do_bootstrap() -> dict:
     t0 = time.time()
     steps = []
     _link_models()
-    AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+    RESULTS_VOL.mkdir(parents=True, exist_ok=True)
     # Pesos de VARIOS repos HF. NO usamos download_weights.sh: fija
     # HF_ENDPOINT=hf-mirror.com (espejo chino, falla desde US) y hace
     # `pip -U huggingface_hub` (re-rompe el hub a >=1.0). Replicamos con el
