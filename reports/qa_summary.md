@@ -65,11 +65,36 @@ fijado en `qa/gates.json`.
   validación 360° con el harness**, a ejecutar JUSTO ANTES de B2 (fusión), que es
   donde el cuerpo entra en juego. Decisión tomada para no gastar GPU ahora.
 
+## B1.5 Paso 1 — vistas sintéticas (2026-07-23, ✅ cerrado)
+
+`worker/b15/make_views.py` — reutiliza `MultiViewGenerator` (Nano Banana 2 Lite,
+Vertex express) para generar 10 vistas (yaw ±15/30/45/60°, pitch ±10°) con QC
+ArcFace. **Resultado: 10/10 válidas** (coseno 0.59–0.78, umbral 0.35), score
+visión **8/10** — mismo pelo/rasgos/tono en todos los ángulos. Muy por encima
+del splat LAM (0.22): son referencias de identidad fuertes.
+Evidencia: `reports/approved/B1.5-paso1_views_qc.png`.
+
+## B1.5 Paso 2 — reconstrucción reforzada (🟡 código listo, sin correr GPU)
+
+Investigación de 4 reconstructores multiview (verificación directa en GitHub,
+no solo el paper): **Avat3r descartado** (repo placeholder sin código/pesos,
+issues sin respuesta 8 meses). De los 3 viables (FlexAvatar, CAP4D, FaceLift),
+se eligió **FaceLift** (ICCV'25, Adobe Research, Apache-2.0) por menor fricción:
+sin gate FLAME, setup liviano, salida `.ply` 3DGS estándar ya compatible con
+`qa/splat_io.py`. CAP4D (FLAME-rigged, mejor encaje futuro con B2 pero exige
+cuenta FLAME + horas de cómputo) queda como plan B. Detalle completo en
+`docs/etapa-b/README.md`.
+
+`worker/b15/reconstruct.py` está escrito y listo — requiere GPU CUDA que no
+existe en este Mac; se ejecutará en una sesión dedicada. FaceLift GENERA la
+cabeza desde cero (no refina el splat LAM con las vistas del Paso 1); se
+compara como generador alterno contra el baseline LAM con el mismo harness.
+
 ## Próximo paso
 
-**B1.5** — `make_views.py` (vistas sintéticas ±45/60°) + `reconstruct.py`
-(refinar los gaussianos laterales contra esas vistas, congelando el frontal).
-Criterio de éxito: re-correr `qa/run_all.sh` y que el estiramiento lateral baje
-sin que ArcFace frontal caiga por debajo de 0.207 — todo medido con esta misma hoja.
+Correr `worker/b15/reconstruct.py` en sesión GPU dedicada → hoja comparativa
+FaceLift vs baseline LAM (`qa/out/sweep/facelift_v1/sheet.png`) → juicio de
+visión sobre GATE-B1.5. Si FaceLift no mejora el estiramiento lateral sin
+sacrificar identidad frontal, probar CAP4D como plan B.
 
 Después: validar cuerpo LHM → **B2** (`fuse.py`) → B3 (Spark) → B4 (UX 3D).

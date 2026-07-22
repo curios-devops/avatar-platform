@@ -10,13 +10,63 @@ Ver `reports/qa0_audit.md` para el detalle. Resumen:
 
 | Fase | Estado | Artefacto |
 |---|---|---|
-| B1 cabeza (LAM) | ✅ real | `avatar-lam-v4`, `.triage/lam_head_v7.ply` (28.4s caliente) |
-| B1 cuerpo (LHM) | 🟡 POC apagado | `avatar-lhm-v1` |
-| B1.5 multiview + refinamiento | ❌ pendiente | (existe `multiview_generator.py`, pero para MICA) |
+| **B1 cabeza (LAM)** | ✅ **cerrado** | `avatar-lam-v4`, `.triage/lam_head_v7.ply`, baseline ArcFace=0.227 validado con harness |
+| B1 cuerpo (LHM) | 🟡 POC apagado — validar 360° justo antes de B2 | `avatar-lhm-v1` |
+| B1.5 Paso 1 (vistas sintéticas) | ✅ **cerrado** — 10/10 vistas válidas, score visión 8/10 | `worker/b15/make_views.py` → `qa/out/b15/views/` |
+| B1.5 Paso 2 (reconstrucción reforzada) | 🟡 código listo, **pendiente correr en GPU** | `worker/b15/reconstruct.py` (FaceLift) |
 | B2 fusión (`fuse.py`) | ❌ pendiente | "el trabajo duro" |
 | B3 runtime Spark | ❌ no migrado | hoy: `frontend/src/engine/webgpu_renderer.ts` (propio) |
 | B4 UX 3D | 🟡 botón deshabilitado en Feed | — |
 | **Harness QA visual** | ✅ **listo** | `qa/` |
+
+## B1.5 — vistas sintéticas + reconstrucción reforzada
+
+### Paso 1 — `worker/b15/make_views.py` (✅ cerrado)
+Reutiliza `MultiViewGenerator` (Nano Banana 2 Lite vía Vertex express) para
+generar 10 vistas (yaw ±15/30/45/60°, pitch ±10°) de `.triage/test_portrait.jpg`,
+con QC de identidad ArcFace (umbral 0.35, mínimo 6 válidas). Resultado real:
+**10/10 válidas**, ArcFace 0.59–0.78 — muy por encima del splat LAM (0.22).
+Evidencia: `reports/approved/B1.5-paso1_views_qc.png`.
+
+```bash
+backend/.venv/bin/python worker/b15/make_views.py \
+    --photo .triage/test_portrait.jpg --out qa/out/b15/views
+```
+
+### Paso 2 — `worker/b15/reconstruct.py` (🟡 código listo, sin correr)
+
+**Investigación de reconstructores** (antes de escribir código): se evaluaron
+4 candidatos con verificación directa en GitHub (no solo el paper) —
+
+| Candidato | Veredicto | Por qué |
+|---|---|---|
+| **Avat3r** | ❌ descartado | Repo placeholder: README vacío, 0 releases, "Initial commit"; issues #1/#2 piden el código sin respuesta 8 meses (nov 2025 → jul 2026) |
+| FlexAvatar (mismo autor, CVPR'26) | opción de respaldo | pesos reales (TUM), pero cadena pesada: Pixel3DMM + pytorch3d-desde-fuente + nvdiffrast ("prone to errors"); salida = avatar code, no confirmé `.ply` portable |
+| CAP4D (CVPR'25 Oral) | opción de respaldo | pesos reales, salida `.ply` **FLAME-rigged** vía GaussianAvatars (mejor encaje futuro con B2) — pero exige **cuenta FLAME** + MMDM "toma horas, >64GB RAM" |
+| **FaceLift** (ICCV'25, Adobe Research) | ✅ **elegido** | Apache-2.0, sin gate, setup liviano (torch 2.4/cu124 + diff-gaussian-rasterization), pesos auto-descarga HuggingFace, salida `gaussians.ply` **3DGS estándar** — confirmado en código (`inference.py:264 save_ply`), directamente compatible con `qa/splat_io.py` |
+
+FaceLift **genera** la cabeza desde cero (foto → sus propias 6 vistas internas
+→ GS-LRM → `.ply`) — no refina el splat LAM con las vistas del Paso 1. Se trata
+como **generador alterno** a comparar contra el baseline LAM con el mismo
+harness, no como refinamiento incremental. Si su identidad lateral no supera a
+LAM, CAP4D queda como plan B (mejor encaje con B2 por venir FLAME-rigged, a
+costa de mucha más fricción de setup).
+
+**Ejecución (sesión GPU dedicada — NO corre en Mac):**
+```bash
+git clone https://github.com/weijielyu/FaceLift
+cd FaceLift && bash setup_env.sh   # torch 2.4.0+cu124 + diff-gaussian-rasterization
+# checkpoints se auto-descargan de HuggingFace (wlyu/OpenFaceLift) al primer uso
+
+python worker/b15/reconstruct.py \
+    --facelift-dir /path/to/FaceLift \
+    --photo .triage/test_portrait.jpg \
+    --out-ply .triage/facelift_head_v1.ply
+# invoca automáticamente qa/run_all.sh al terminar → hoja comparativa vs baseline LAM
+```
+Criterio de éxito (GATE-B1.5): huecos <1%, ArcFace frontal ≥0.207 (baseline−0.02),
+y a simple vista el estiramiento lateral en ±45° debe reducirse vs
+`reports/approved/GATE-B1.5_baseline_lam.png`.
 
 ## Harness de QA visual (`qa/`)
 
