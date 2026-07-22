@@ -31,8 +31,14 @@ import runpod
 MUSETALK_ROOT = Path(os.getenv("MUSETALK_ROOT", "/opt/MuseTalk"))
 VOL = Path("/runpod-volume")
 MODELS_VOL = VOL / "models"                 # pesos (persistentes)
-AVATARS_DIR = VOL / "avatars"               # latentes por avatar
+# La clase Avatar hardcodea ./results/v15/avatars/{id}; symlinkamos results al
+# volumen para que latentes y salidas PERSISTAN entre workers (prepare-once).
+RESULTS_VOL = VOL / "results"
 FPS = 25
+
+
+def _avatar_path(key: str) -> Path:
+    return MUSETALK_ROOT / "results" / "v15" / "avatars" / key
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("musetalk_worker")
@@ -47,21 +53,26 @@ def _sh(cmd: str) -> None:
     subprocess.run(cmd, shell=True, check=True)
 
 
-def _link_models() -> None:
-    """Symlink /opt/MuseTalk/models → volumen (los pesos viven en el volumen)."""
-    MODELS_VOL.mkdir(parents=True, exist_ok=True)
-    link = MUSETALK_ROOT / "models"
+def _symlink(link: Path, target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
     if link.is_symlink():
-        if link.resolve() != MODELS_VOL.resolve():
-            link.unlink(); link.symlink_to(MODELS_VOL)
-    elif link.exists():           # dir real de la imagen → moverlo al volumen 1ª vez
+        if link.resolve() != target.resolve():
+            link.unlink(); link.symlink_to(target)
+    elif link.exists():           # dir real de la imagen → mover contenido al volumen
         for p in link.iterdir():
-            dest = MODELS_VOL / p.name
+            dest = target / p.name
             if not dest.exists():
                 _sh(f"cp -r '{p}' '{dest}'")
-        _sh(f"rm -rf '{link}'"); link.symlink_to(MODELS_VOL)
+        _sh(f"rm -rf '{link}'"); link.symlink_to(target)
     else:
-        link.symlink_to(MODELS_VOL)
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
+
+
+def _link_models() -> None:
+    """models + results → volumen (pesos y latentes persisten entre workers)."""
+    _symlink(MUSETALK_ROOT / "models", MODELS_VOL)
+    _symlink(MUSETALK_ROOT / "results", RESULTS_VOL)
 
 
 def do_bootstrap() -> dict:
@@ -184,10 +195,11 @@ def _make_avatar(avatar_key: str, video_path: str, preparation: bool):
         setattr(ri, k, v)
     ri.args = type("A", (), {
         "version": "v15", "extra_margin": 10, "parsing_mode": "jaw",
-        "skip_save_images": True, "audio_padding_length_left": 2,
+        # False → MuseTalk escribe vid_output/{name}.mp4 (con audio muxeado)
+        "skip_save_images": False, "audio_padding_length_left": 2,
         "audio_padding_length_right": 2, "fps": FPS, "batch_size": 20,
         "output_vid_name": None, "left_cheek_width": 90, "right_cheek_width": 90,
-        "result_dir": str(AVATARS_DIR), "avatar_dir": str(AVATARS_DIR),
+        "result_dir": str(RESULTS_VOL), "avatar_dir": str(RESULTS_VOL),
     })()
     return ri.Avatar(avatar_id=avatar_key, video_path=video_path,
                      bbox_shift=0, batch_size=20, preparation=preparation)
@@ -195,7 +207,7 @@ def _make_avatar(avatar_key: str, video_path: str, preparation: bool):
 
 def _get_avatar(key: str):
     if key not in _avatars:
-        if not (AVATARS_DIR / key).exists():
+        if not _avatar_path(key).exists():
             return None
         _avatars[key] = _make_avatar(key, video_path="", preparation=False)
     return _avatars[key]
@@ -251,15 +263,14 @@ def handler(job):
                                 "-ar", "16000", "-ac", "1", str(wav)], check=True)
                 out_name = f"chunk_{int(time.time()*1000)}"
                 av.inference(audio_path=str(wav), out_vid_name=out_name,
-                             fps=FPS, skip_save_images=True)
-                cands = glob.glob(str(AVATARS_DIR / key / "vid_output" / f"{out_name}*"))
+                             fps=FPS, skip_save_images=False)
+                cands = glob.glob(str(_avatar_path(key) / "vid_output" / f"{out_name}*"))
                 if not cands:
                     return {"error": "MuseTalk no produjo video"}
+                # MuseTalk ya muxeó audio + libx264/yuv420p; +faststart para web
                 final = Path(td) / "final.mp4"
                 subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", cands[0],
-                                "-i", str(audio_in), "-c:v", "libx264", "-preset", "veryfast",
-                                "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
-                                str(final)], check=True)
+                                "-c", "copy", "-movflags", "+faststart", str(final)], check=True)
                 os.unlink(cands[0])
                 return {"video_b64": base64.b64encode(final.read_bytes()).decode(),
                         "seconds": round(time.time() - t0, 2)}
