@@ -7,6 +7,7 @@ INPUT:
 
 OUTPUT:
   { "gaussians_ply_gz_b64": "<base64 gzip(standard 3DGS PLY)>",
+    "smplx_betas": [<300 floats>],   # SMPL-X shape (canonical/neutral pose)
     "lhm_commit": "<git sha>", "inference_s": <float>, "ply_bytes": <int> }
   or { "error": "<message>" } — NEVER a silent fallback (MICA lesson).
 
@@ -45,8 +46,10 @@ LHM_MODEL = os.getenv("LHM_MODEL", "LHM-500M-HF")
 _MAX_B64_BYTES = 18 * 1024 * 1024
 
 
-def _run_lhm(image_path: str) -> str:
-    """Run LHM mesh-export inference; return path to the produced 3DGS PLY."""
+def _run_lhm(image_path: str) -> tuple[str, str | None]:
+    """Run LHM mesh-export inference; return (ply_path, betas_npy_path_or_None).
+    betas sidecar comes from the B2 patch (patch_export_betas.py) — LHM's own
+    infer_mesh() computes SMPL-X betas but never saves them."""
     shutil.rmtree(f"{LHM_ROOT}/exps", ignore_errors=True)  # no stale PLYs on warm workers
     env = {**os.environ, "CUDA_VISIBLE_DEVICES": "0",
            "PYTHONPATH": f"{os.environ.get('PYTHONPATH','')}:{LHM_ROOT}"}
@@ -78,7 +81,12 @@ def _run_lhm(image_path: str) -> str:
         raise FileNotFoundError(
             f"LHM produced no .ply — stdout tail: {proc.stdout[-1000:]}"
         )
-    return candidates[0]
+    ply_path = candidates[0]
+    betas_path = ply_path.replace(".ply", "_betas.npy")
+    if not os.path.exists(betas_path):
+        logger.warning("LHM: no betas sidecar at %s (patch not applied to this image?)", betas_path)
+        betas_path = None
+    return ply_path, betas_path
 
 
 def handler(event: dict) -> dict:
@@ -101,8 +109,12 @@ def handler(event: dict) -> dict:
             image_path = os.path.join(tmp, "input.jpg")
             with open(image_path, "wb") as f:
                 f.write(base64.b64decode(b64))
-            ply_path = _run_lhm(image_path)
+            ply_path, betas_path = _run_lhm(image_path)
             ply_bytes = open(ply_path, "rb").read()
+            betas = None
+            if betas_path:
+                import numpy as np
+                betas = np.load(betas_path).reshape(-1).tolist()
 
         gz = gzip.compress(ply_bytes, compresslevel=6)
         out_b64 = base64.b64encode(gz).decode()
@@ -113,10 +125,12 @@ def handler(event: dict) -> dict:
             )}
 
         commit = open("/opt/LHM_COMMIT").read().strip() if os.path.exists("/opt/LHM_COMMIT") else "?"
-        logger.info("LHM done: %s (%d bytes raw, %d gz) in %.1fs",
-                    ply_path, len(ply_bytes), len(gz), time.monotonic() - started)
+        logger.info("LHM done: %s (%d bytes raw, %d gz, betas=%s) in %.1fs",
+                    ply_path, len(ply_bytes), len(gz), "yes" if betas else "MISSING",
+                    time.monotonic() - started)
         return {
             "gaussians_ply_gz_b64": out_b64,
+            "smplx_betas": betas,
             "lhm_commit": commit,
             "ply_bytes": len(ply_bytes),
             "inference_s": round(time.monotonic() - started, 1),

@@ -25,6 +25,11 @@ WORKDIR /opt
 RUN git clone https://github.com/aigc3d/LHM.git && cd LHM && \
     git rev-parse HEAD > /opt/LHM_COMMIT
 
+# B2 needs the SMPL-X betas that infer_mesh() computes but discards — patch
+# it to also dump a sidecar <name>_betas.npy next to the exported .ply.
+COPY worker/lhm_worker/patch_export_betas.py /tmp/patch_export_betas.py
+RUN python /tmp/patch_export_betas.py /opt/LHM/LHM/runners/infer/human_lrm.py
+
 WORKDIR /opt/LHM
 # LHM's own installer: torch 2.3 cu121 wheels + pytorch3d, sam2,
 # diff-gaussian-rasterization, simple-knn from source.
@@ -38,6 +43,16 @@ RUN pip install "huggingface_hub[cli]>=0.23,<1.0" && \
       huggingface-cli download 3DAIGC/LHM-500M-HF --local-dir ./pretrained_models_tmp ) && \
     mkdir -p pretrained_models && \
     cp -r pretrained_models_tmp/* pretrained_models/ && rm -rf pretrained_models_tmp
+
+# SMPL-X prior model assets — install_cu121.sh does NOT fetch these, but
+# LHM/models/rendering/smpl_x_voxel_dense_sampling.py loads
+# human_model_path/smplx/SMPL-X__FLAME_vertex_ids.npy at INFERENCE time (not
+# just training). Missing this tar is a likely reason the original POC never
+# produced a validated body.ply. Also the exact asset B2 (fuse.py) needs for
+# the FLAME<->SMPL-X registration — no separate license fetch required.
+RUN wget -q https://virutalbuy-public.oss-cn-hangzhou.aliyuncs.com/share/aigc3d/data/for_lingteng/LHM/LHM_prior_model.tar \
+      -O /tmp/LHM_prior_model.tar && \
+    tar -xf /tmp/LHM_prior_model.tar -C /opt/LHM && rm /tmp/LHM_prior_model.tar
 
 # Assets the runner lazily fetches at first inference — bake them so a cold
 # worker doesn't depend on external hosts at job time.

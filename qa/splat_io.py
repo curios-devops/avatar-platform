@@ -82,6 +82,33 @@ def quat_to_rotmat(q: np.ndarray) -> np.ndarray:
     return R
 
 
+def save_ply(g: Gaussians, path: str | Path) -> None:
+    """Escribe un PLY 3DGS binario (mismas propiedades que load_ply lee) —
+    inversas exactas de las transformaciones de carga: RGB→f_dc, opacidad→
+    logit, escala lineal→log. rot se re-normaliza por seguridad."""
+    path = Path(path)
+    n = len(g)
+    f_dc = (g.rgb - 0.5) / _SH_C0
+    opacity_logit = np.log(np.clip(g.opacity, 1e-6, 1 - 1e-6) /
+                           (1 - np.clip(g.opacity, 1e-6, 1 - 1e-6)))
+    log_scale = np.log(np.maximum(g.scale, 1e-9))
+    rot = g.rot / (np.linalg.norm(g.rot, axis=1, keepdims=True) + 1e-9)
+    nx_nz = np.zeros((n, 3), dtype=np.float32)  # normals: LAM/LHM no las usan
+
+    props = ["x", "y", "z", "nx", "ny", "nz",
+             "f_dc_0", "f_dc_1", "f_dc_2", "opacity",
+             "scale_0", "scale_1", "scale_2", "rot_0", "rot_1", "rot_2", "rot_3"]
+    data = np.concatenate([g.xyz, nx_nz, f_dc, opacity_logit[:, None],
+                           log_scale, rot], axis=1).astype("<f4")
+
+    header = "ply\nformat binary_little_endian 1.0\n" \
+             f"element vertex {n}\n" + \
+             "".join(f"property float {p}\n" for p in props) + "end_header\n"
+    with path.open("wb") as f:
+        f.write(header.encode("ascii"))
+        f.write(data.tobytes())
+
+
 def covariance3d(g: Gaussians) -> np.ndarray:
     """Σ3d = R S S^T R^T por gaussiano → (N,3,3)."""
     R = quat_to_rotmat(g.rot)

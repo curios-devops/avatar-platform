@@ -90,11 +90,28 @@ existe en este Mac; se ejecutará en una sesión dedicada. FaceLift GENERA la
 cabeza desde cero (no refina el splat LAM con las vistas del Paso 1); se
 compara como generador alterno contra el baseline LAM con el mismo harness.
 
+## B2 — fusión cabeza-cuerpo (2026-07-23, 🟡 código listo, sin correr GPU)
+
+`worker/b2/fuse.py` implementa el algoritmo completo del doc (segmentación
+SMPL-X geométrica, registro Procrustes con normalización IPD, carve+rampa de
+opacidad, match de color LAB, export `.ply`+`rig.json`). Hallazgo de auditoría
+corregido en el camino: el worker LHM calculaba los betas SMPL-X pero los
+descartaba (parche `patch_export_betas.py`), y el Dockerfile no bajaba
+`LHM_prior_model.tar` — probable causa de que el POC nunca produjera un
+`body.ply` válido. Ambos arreglados. Detalle completo en `docs/etapa-b/README.md`.
+
+**Verificado sin GPU:** 6/6 tests unitarios con numpy puro sobre datos
+sintéticos — Procrustes recupera una transformación ground-truth a precisión
+de máquina, cuaterniones se preservan unitarios, carve/rampa de opacidad y
+match de color se comportan como se espera. Los heurísticos de detección de
+landmarks sobre splats reales (única parte no testeable sin GPU) quedan para
+el juicio del gate visual GATE-B2.
+
 ## Próximo paso
 
-Correr `worker/b15/reconstruct.py` en sesión GPU dedicada → hoja comparativa
-FaceLift vs baseline LAM (`qa/out/sweep/facelift_v1/sheet.png`) → juicio de
-visión sobre GATE-B1.5. Si FaceLift no mejora el estiramiento lateral sin
-sacrificar identidad frontal, probar CAP4D como plan B.
-
-Después: validar cuerpo LHM → **B2** (`fuse.py`) → B3 (Spark) → B4 (UX 3D).
+Sesión GPU dedicada (bundlea 3 pendientes): (1) validar cuerpo LHM 360°
+(diferido del cierre de B1) — con el fix de `LHM_prior_model.tar` esto TAMBIÉN
+produce el `body.ply`+betas que B2 necesita; (2) `worker/b15/reconstruct.py`
+(FaceLift) → hoja comparativa vs baseline LAM, juicio GATE-B1.5; (3)
+`worker/b2/fuse.py` con el head.ply ganador (LAM o FaceLift) + el body.ply
+recién validado → hoja GATE-B2. Después: B3 (Spark) → B4 (UX 3D).

@@ -33,6 +33,16 @@ class RunPodLHMClient:
 
     async def reconstruct(self, image_bytes: bytes) -> bytes:
         """Photo (half or full body) → standard 3DGS PLY bytes."""
+        ply_bytes, _betas = await self.reconstruct_with_betas(image_bytes)
+        return ply_bytes
+
+    async def reconstruct_with_betas(
+        self, image_bytes: bytes
+    ) -> tuple[bytes, list[float] | None]:
+        """Photo → (PLY bytes, SMPL-X betas or None). B2 (worker/b2/fuse.py)
+        needs the betas to build the body's head/neck region for fusion —
+        see worker/lhm_worker/patch_export_betas.py for why they're not
+        always present (patch not applied to a given image build)."""
         payload = {
             "job_type": "lhm_reconstruct",
             "image_b64": base64.b64encode(image_bytes).decode(),
@@ -65,11 +75,12 @@ class RunPodLHMClient:
                             f"LHM returned no PLY (keys: {list(output)})"
                         )
                     logger.info(
-                        "LHM done in %.0fs (worker inference %.1fs, %s raw bytes)",
+                        "LHM done in %.0fs (worker inference %.1fs, %s raw bytes, betas=%s)",
                         elapsed, output.get("inference_s", -1),
                         output.get("ply_bytes", "?"),
+                        "yes" if output.get("smplx_betas") else "MISSING",
                     )
-                    return gzip.decompress(base64.b64decode(b64))
+                    return gzip.decompress(base64.b64decode(b64)), output.get("smplx_betas")
                 if status in _TERMINAL:
                     raise RuntimeError(
                         f"LHM job {job_id} ended {status}: {data.get('error')}"
