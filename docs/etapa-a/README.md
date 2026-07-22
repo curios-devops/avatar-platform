@@ -100,3 +100,26 @@ detectó con evidencia, sin cantar victoria en falso.
 - Latencia 5,3 s/frase > 4 s objetivo (ver mitigaciones).
 - Concurrencia ≥3 sesiones/GPU: no medida aún (workersMax 2, escala por cola).
 - `listen` con boca entreabierta a media (irrelevante: MuseTalk repinta al hablar).
+
+### A3 — Feed con lip-sync FUNCIONANDO en navegador (2026-07-22)
+E2E verificado: `?feed=1` → escribir/hablar → el clon responde hablando con
+lip-sync (video_chunks 9:16 servidos y reproducidos). Captura:
+`.triage/feed_lipsync_playing.png`.
+
+Bugs resueltos en la integración:
+- **Clips base en mp4v**: `prep_clips` usaba `cv2.VideoWriter(mp4v)` (MPEG-4
+  Part 2) → el navegador lo rechaza (video err 4). Ahora transcodifica a H.264.
+- **Proceso zombi**: un uvicorn viejo en `127.0.0.1:8000` servía código
+  atascado y el navegador le hablaba a él. Un solo backend.
+- **Solo-vídeo cuando lip-sync**: el vídeo lleva su audio; no emitir audio_chunk
+  (evita audio + reinicio con el vídeo).
+- **/tmp se limpia**: re-siembra de clips demo al arrancar el backend.
+
+### Latencia de primer mensaje (realidad)
+- Worker plenamente caliente: **~6 s** (speak directo).
+- Primer mensaje de una sesión (warmup de 16 s corriendo aún): **~14-20 s**.
+  El warmup-on-connect ayuda pero no oculta del todo el arranque en frío.
+- Tras el primer intercambio, el worker queda caliente (idle 300 s) → la
+  conversación fluye a ~6 s/frase, y el pipelining oculta más.
+- Producción con latencia garantizada: `workersMin=1` (siempre caliente, con
+  coste) o pings de keep-warm. Para el POC se acepta el primer mensaje lento.
