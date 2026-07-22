@@ -112,6 +112,7 @@ class ConversationSession:
                 full_reply.append(sentence)
                 sentence_audio = bytearray()
                 tts_kwargs = {"voice_id": self.voice_id} if self.voice_id else {}
+                lipsync = self._lipsync_enabled()
                 async for chunk in stream_sentence_tts(sentence, **tts_kwargs):
                     import base64 as _b64
                     sentence_audio += _b64.b64decode(chunk.audio_b64)
@@ -121,6 +122,11 @@ class ConversationSession:
                         lat = int((t_first_audio - (t_first_token or t_first_audio)) * 1000)
                         logger.info("[%s] primer chunk de audio: %s ms tras primer token",
                                     self.session_id, lat)
+                    if lipsync:
+                        # con lip-sync el vídeo lleva su propio audio → no emitir
+                        # audio_chunk (evita que el audio suene y luego el vídeo
+                        # lo reinicie). El TTS igual se acumula para MuseTalk.
+                        continue
                     await self.emit(self._msg(
                         estado="hablando", gesto=gesto, texto_frase=sentence,
                         audio_chunk=chunk.audio_b64, visemas=chunk.visemas,
