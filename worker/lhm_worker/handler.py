@@ -78,8 +78,32 @@ def _run_lhm(image_path: str) -> tuple[str, str | None]:
         reverse=True,
     )
     if not candidates:
+        # rc==0 with no .ply, repeatedly, with a clean-looking tail (progress
+        # bars reaching 100%, no traceback) — a raw find dump was mostly HF
+        # cache/pycache noise and got truncated before saying anything useful.
+        # Ask targeted questions instead: does exps/ even exist, is there a
+        # .ply ANYWHERE, and is there an Error/Traceback line buried in the
+        # middle of stdout/stderr that a tail-only slice would miss.
+        exps_dir = f"{LHM_ROOT}/exps"
+        exps_listing = (
+            subprocess.run(["find", exps_dir], capture_output=True, text=True, timeout=10).stdout
+            if os.path.isdir(exps_dir) else "<exps/ does not exist>"
+        )
+        any_ply = subprocess.run(
+            ["find", LHM_ROOT, "-name", "*.ply", "-newer", image_path],
+            capture_output=True, text=True, timeout=15,
+        ).stdout
+        combined = proc.stdout + "\n" + proc.stderr
+        flagged = "\n".join(
+            l for l in combined.splitlines()
+            if "Error" in l or "Traceback" in l or "Exception" in l or "Fail" in l
+        )
         raise FileNotFoundError(
-            f"LHM produced no .ply — stdout tail: {proc.stdout[-1000:]}"
+            f"LHM produced no .ply (rc=0)\n"
+            f"exps/ listing: {exps_listing[:800] or '<empty>'}\n"
+            f"any .ply anywhere under LHM_ROOT: {any_ply[:500] or '<none>'}\n"
+            f"error/traceback/exception lines anywhere in output: {flagged[:2000] or '<none found>'}\n"
+            f"stderr tail: {proc.stderr[-600:]}"
         )
     ply_path = candidates[0]
     betas_path = ply_path.replace(".ply", "_betas.npy")

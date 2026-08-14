@@ -46,7 +46,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "qa"))
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "backend"))  # app.pipeline.*
 sys.path.insert(0, str(Path(__file__).parent))
 
 from splat_io import Gaussians, load_ply, save_ply  # noqa: E402
@@ -85,8 +85,12 @@ def _head_landmarks(head: Gaussians) -> dict[str, np.ndarray]:
     eye_l = head.xyz[left].mean(axis=0) if left.sum() else center + [-0.035, 0.02, 0.03]
     eye_r = head.xyz[right].mean(axis=0) if right.sum() else center + [0.035, 0.02, 0.03]
 
-    # mentón: punto más bajo (-Y) de la banda frontal de piel
-    lower_face = face_band & (y < -0.04) & (z > np.percentile(z[face_band], 50))
+    # mentón: punto más bajo (-Y) de la banda frontal de piel, restringido a
+    # la línea media (mismo principio que la nariz) — sin esto, el punto más
+    # bajo puede caer en pelo/ruido lejos del centro (visto en FaceLift: un
+    # mentón detectado con |x|=0.043, tan lateral como un ojo, que producía
+    # una rotación de Procrustes muy sesgada).
+    lower_face = face_band & (y < -0.04) & (z > np.percentile(z[face_band], 50)) & (np.abs(x) < 0.02)
     chin = head.xyz[lower_face][np.argmin(y[lower_face])] if lower_face.sum() else center + [0, -0.09, 0.04]
 
     return {"nose": nose, "eye_l": eye_l, "eye_r": eye_r, "chin": chin}
@@ -105,7 +109,13 @@ def _body_landmarks(smplx_out_joints: np.ndarray, joint_names: list[str]) -> dic
         "nose": pt(["nose", "nose_middle", "face-2"]),
         "eye_l": pt(["left_eye", "leye", "face-38"]),
         "eye_r": pt(["right_eye", "reye", "face-44"]),
-        "chin": pt(["chin", "jaw", "face-9"]),
+        # "chin"/"face-9" don't exist in smplx's JOINT_NAMES (144 joints,
+        # use_face_contour=True) — the old fallback landed on "jaw" (idx 22),
+        # SMPL-X's kinematic jaw-HINGE joint (near the TMJ/ear), not the chin
+        # tip. That ~5cm mislocation was enough to skew Procrustes rotation
+        # by ~50°, confirmed on real FaceLift+LHM data. The real chin-tip
+        # landmark is the face contour's bottom-middle point.
+        "chin": pt(["contour_middle", "chin", "jaw", "face-9"]),
     }
 
 
@@ -147,7 +157,26 @@ def procrustes(src: dict[str, np.ndarray], dst: dict[str, np.ndarray]) -> tuple[
     residual = np.sqrt(np.mean(np.sum((s_fine * (Sc @ R.T) - Dc) ** 2, axis=1)))
     print(f"[fuse] Procrustes: escala_ipd={scale_norm:.4f} escala_fina={s_fine:.4f} "
          f"residual={residual*1000:.2f}mm")
-    return R, s_total, t
+    return R, s_total, t, residual
+
+
+def register_head_to_body(head_lm: dict[str, np.ndarray],
+                          body_lm: dict[str, np.ndarray]) -> tuple[np.ndarray, float, np.ndarray]:
+    """Envoltorio de procrustes() que prueba AMBAS asignaciones ojo_izq/ojo_der
+    del lado cabeza y se queda con la de menor residual. Necesario porque la
+    convención "izquierda/derecha" de los heurísticos geométricos sobre la
+    nube de splats (`_head_landmarks`, viewer-relative por signo de x) no
+    tiene garantía de coincidir con la convención anatómica de SMPL-X — un
+    desajuste real detectado con datos reales (LAM v7 + SMPL-X neutral):
+    residual 39mm y escala 0.74 con la asignación "obvia" vs. residual <1mm
+    con los ojos intercambiados. Auto-corrige en vez de asumir la convención."""
+    straight = procrustes(head_lm, body_lm)
+    swapped_lm = {**head_lm, "eye_l": head_lm["eye_r"], "eye_r": head_lm["eye_l"]}
+    swapped = procrustes(swapped_lm, body_lm)
+    R, s, t, res = straight if straight[3] <= swapped[3] else swapped
+    which = "directa" if straight[3] <= swapped[3] else "ojos intercambiados"
+    print(f"[fuse] registro: asignación '{which}' elegida (residual {res*1000:.2f}mm)")
+    return R, s, t
 
 
 def apply_transform(g: Gaussians, R: np.ndarray, s: float, t: np.ndarray) -> Gaussians:
@@ -262,21 +291,22 @@ def main() -> int:
     betas = np.load(args.betas).reshape(-1)
     print(f"[fuse] head={len(head)} splats  body={len(body)} splats  betas={betas.shape}")
 
-    from pipeline.flame_template import load as load_flame  # backend/app/pipeline
+    from app.pipeline.flame_template import load as load_flame
     flame = load_flame()
     sx = smplx_body.build(betas, args.human_model_path, flame.v_template)
 
     # landmarks del cuerpo vía joints faciales de SMPL-X (use_face_contour)
     import torch, smplx as smplx_pkg
+    from smplx.joint_names import JOINT_NAMES
     model = smplx_pkg.create(str(args.human_model_path), "smplx", gender="neutral",
                              num_betas=len(betas), use_face_contour=True, use_pca=False)
     out = model(betas=torch.as_tensor(betas, dtype=torch.float32).unsqueeze(0), return_verts=True)
     joints = out.joints[0].detach().cpu().numpy()
-    joint_names = list(smplx_pkg.joint_names.JOINT_NAMES)[:joints.shape[0]]
+    joint_names = list(JOINT_NAMES)[:joints.shape[0]]
     body_lm = _body_landmarks(joints, joint_names)
     head_lm = _head_landmarks(head)
 
-    R, s, t = procrustes(head_lm, body_lm)
+    R, s, t = register_head_to_body(head_lm, body_lm)
     head_reg = apply_transform(head, R, s, t)
 
     seam_pt = body_lm["chin"] - np.array([0, 0.005, 0])  # justo bajo la mandíbula

@@ -28,6 +28,9 @@ build/
 .DS_Store
 Thumbs.db
 
+# Docker build assets fetched at build time (large binaries, not source)
+docker/assets/
+
 # Data & model weights — never commit
 *.ply
 *.mp4
