@@ -1,0 +1,11 @@
+# Python >= 3.10 (Anny). The backend venv stays on 3.9 and only runs landmarks.py (MediaPipe).
+anny @ git+https://github.com/naver/anny.git
+torch
+roma
+numpy
+scipy
+trimesh
+pygltflib
+pillow
+fastapi
+uvicorn[standard]
