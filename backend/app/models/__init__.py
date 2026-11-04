@@ -6,12 +6,16 @@ from datetime import datetime
 class CreateAvatarRequest(BaseModel):
     video_url: str
     mode: Literal["head", "full_body"] = "head"
+    # La persona declara que el vídeo es suyo (Twin de uno mismo, 16+)
+    consent: bool = False
 
 
 class ProcessPhotoRequest(BaseModel):
     photo_url: str  # URL returned by POST /avatar/upload or any accessible photo URL
     # Avatar tier: "head" → LAM gaussian head, "half"/"full" → LHM body avatar
     tier: str = "head"
+    # La persona declara que la foto es suya (Twin de uno mismo, 16+)
+    consent: bool = False
 
 
 class GenerateAvatarRequest(BaseModel):

@@ -18,6 +18,13 @@ from ..workers.generate_worker import run_generate_pipeline
 
 router = APIRouter(prefix="/avatar", tags=["avatar"])
 
+
+def _likeness_consent(consent: bool) -> dict:
+    """Consentimiento Twin: obligatorio para fotos y vídeos de personas reales."""
+    if settings.REQUIRE_LIKENESS_CONSENT and not consent:
+        raise HTTPException(status_code=422, detail="consent_required")
+    return {"consent_at": datetime.utcnow().isoformat() + "Z"} if consent else {}
+
 # Last time we pinged the LAM endpoint awake (monotonic seconds).
 # The endpoint's idleTimeout is 600 s, so re-pinging sooner than ~8 min
 # just burns a request; the throttle keeps page reloads free.
@@ -69,11 +76,13 @@ async def create_avatar(request: CreateAvatarRequest):
     3. RunPod job: COLMAP + SplattingAvatar + gsplat
     4. Export gaussian .ply + metadata
     """
+    consent = _likeness_consent(request.consent)
     try:
         # Submit reconstruction job
         job_id = queue_service.submit_job("reconstruction", {
             "video_url": request.video_url,
-            "mode": request.mode
+            "mode": request.mode,
+            **consent,
         })
 
         # Submit to RunPod
@@ -129,6 +138,7 @@ async def process_photo(
     Poll GET /avatar/job/{job_id}/status for progress.
     When status == "done", result contains the full AvatarBundle including preview_url.
     """
+    consent = _likeness_consent(request.consent)
     if request.tier not in ("head", "half", "full"):
         raise HTTPException(status_code=422, detail=f"invalid tier: {request.tier}")
     if request.tier != "head" and not settings.RUNPOD_LHM_ENDPOINT_ID:
@@ -137,7 +147,7 @@ async def process_photo(
             detail="Body avatars not available yet (RUNPOD_LHM_ENDPOINT_ID unset)",
         )
     job_id = queue_service.submit_job(
-        "avatar_pipeline", {"photo_url": request.photo_url, "tier": request.tier}
+        "avatar_pipeline", {"photo_url": request.photo_url, "tier": request.tier, **consent}
     )
     background_tasks.add_task(
         run_avatar_pipeline, job_id, request.photo_url, tier=request.tier

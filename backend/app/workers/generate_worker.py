@@ -2,10 +2,10 @@
 Background worker: text description → face image → full FLAME-rigged avatar pipeline.
 
 Stages:
-  generating  — OpenAI gpt-image-1 creates a face image from the prompt
+  generating  — IMAGE_GEN_PROVIDER (openai | pruna | nanobanana) creates a face image
   + all stages from pipeline_worker (ingest → publish)
 
-Falls back to the deterministic mock generator when OPENAI_API_KEY is not set.
+Falls back to the deterministic mock generator when no image provider is configured.
 """
 from __future__ import annotations
 
@@ -36,14 +36,12 @@ async def run_generate_pipeline(job_id: str, description: str, style: str) -> No
 
 
 async def _generate_image(description: str, style: str) -> bytes:
-    from ..config import settings
+    from ..services.openai_image import generate_face_image, resolve_provider
 
-    if settings.OPENAI_API_KEY:
-        logger.info("job: using OpenAI gpt-image-1 for %r (style=%s)", description[:40], style)
-        from ..services.openai_image import generate_face_image
+    if resolve_provider():
         return await generate_face_image(description, style)
 
-    logger.info("job: OPENAI_API_KEY not set — using mock image generator")
+    logger.info("job: sin proveedor de imagen configurado — using mock image generator")
     from ..mocks.mock_image_generator import generate_image
     import asyncio
     return await asyncio.get_event_loop().run_in_executor(

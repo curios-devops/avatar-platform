@@ -256,9 +256,9 @@ Returns `AvatarBundle` with final URLs.
 
 ```bash
 # 1. Copy env template
-cp .env.example .env
+cp backend/.env.example backend/.env
 
-# 2. Edit .env — set MOCK_PIPELINE=true and leave RunPod endpoint IDs blank.
+# 2. Edit backend/.env — set MOCK_PIPELINE=true and leave RunPod endpoint IDs blank.
 #    R2 credentials are still required (or use a local MinIO for storage).
 
 # 3. Start Redis
@@ -615,7 +615,7 @@ UI shortcut — returns only the preview URL without requiring the caller to par
 
 ### Local (mocks, no GPU required)
 
-- [ ] `cp .env.example .env` and set `MOCK_PIPELINE=true`
+- [ ] `cp backend/.env.example backend/.env` and set `MOCK_PIPELINE=true`
 - [ ] Set R2 credentials (or local MinIO: `S3_ENDPOINT=http://localhost:9000`)
 - [ ] `docker run -d -p 6379:6379 redis:7-alpine`
 - [ ] `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`

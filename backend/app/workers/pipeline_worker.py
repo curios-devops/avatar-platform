@@ -12,8 +12,8 @@ Everything else runs on CPU in this backend:
   reconstruct LocalReconstructor gaussian sampling   (replaces GPU reconstruct)
   rig/package/publish — unchanged CPU stages
 
-Fallbacks: MICA unavailable → local mediapipe fitter (or mock when
-MOCK_PIPELINE). See backend/MVP-production-pipeline.md for the decision log.
+Head avatars go through LAM (RunPod); if LAM fails the job fails. The legacy
+MICA/CPU path below only runs with MOCK_PIPELINE or LEGACY_HEAD_PIPELINE=true. See backend/MVP-production-pipeline.md for the decision log.
 """
 import asyncio
 import io
@@ -191,7 +191,8 @@ async def run_avatar_pipeline(
 
         # ── 3a-bis. LAM one-shot gaussian head (preferred core when configured)
         # Photo → FLAME-rigged gaussian avatar with hair in one GPU call.
-        # On any failure we fall through to the legacy multiview/MICA path.
+        # On failure the job fails visibly; the legacy multiview/MICA path below
+        # only runs with MOCK_PIPELINE or LEGACY_HEAD_PIPELINE=true (QA).
         if settings.RUNPOD_LAM_ENDPOINT_ID and not settings.MOCK_PIPELINE:
             _stage(job_id, _p(0.30), "lam_reconstruct")
             try:
@@ -226,10 +227,21 @@ async def run_avatar_pipeline(
                 logger.info("job=%s done via LAM — %d KB ply", job_id, len(ply_bytes) // 1024)
                 return
             except Exception as lam_exc:
-                logger.warning(
-                    "job=%s LAM failed (%s) — falling back to legacy pipeline",
-                    job_id, lam_exc,
+                # Sin fallback: el pipeline legacy entrega una cara deformada y
+                # para un clon digital es peor que un error honesto.
+                logger.exception("job=%s LAM failed", job_id)
+                queue_service.update_job_status(
+                    job_id, "failed",
+                    error=f"lam_failed: {lam_exc}",
                 )
+                return
+
+        if not settings.MOCK_PIPELINE and not settings.LEGACY_HEAD_PIPELINE:
+            queue_service.update_job_status(
+                job_id, "failed",
+                error="lam_unavailable: RUNPOD_LAM_ENDPOINT_ID unset",
+            )
+            return
 
         # ── 3b. Multi-view synthesis (Nano Banana) ─────────────────────────────
         # Keeps bytes in memory (for MICA) and uploads URLs (for frontend orbit).

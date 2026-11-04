@@ -8,6 +8,7 @@ frases → TTS con timestamps → mensajes del contrato. Soporta interrupción
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import re
 import time
@@ -93,6 +94,9 @@ class ConversationSession:
             lipsync_tasks: list[asyncio.Task] = []
             emitter: asyncio.Task | None = None
             if self._lipsync_enabled():
+                sentence_audios: list[bytes] = []
+                audio_fallback: list[int] = []
+
                 async def _emit_videos():
                     i = 0
                     while True:
@@ -103,6 +107,14 @@ class ConversationSession:
                             await self.emit(self._msg(
                                 estado="hablando", gesto=gest, texto_frase=sent,
                                 video_chunk=url))
+                        else:
+                            # lip-sync caído: la frase se oye igual (el MP3 no se
+                            # emitió antes porque se esperaba el vídeo)
+                            await self.emit(self._msg(
+                                estado="hablando", gesto=gest, texto_frase=sent,
+                                audio_chunk=base64.b64encode(sentence_audios[i]).decode(),
+                                lat_primer_chunk_ms=0 if not audio_fallback else None))
+                            audio_fallback.append(i)
                         i += 1
                 emitter = asyncio.create_task(_emit_videos())
 
@@ -133,6 +145,7 @@ class ConversationSession:
                         lat_primer_chunk_ms=lat,
                     ))
                 if self._lipsync_enabled():
+                    sentence_audios.append(bytes(sentence_audio))
                     lipsync_tasks.append(asyncio.create_task(
                         self._lipsync_sentence(bytes(sentence_audio), sentence, gesto, idx)))
                 idx += 1

@@ -51,8 +51,9 @@ avatar-platform/
 
 ```bash
 cd /Users/marcelo/Documents/avatar-platform
-cp .env.example .env
-# Edit .env with your RunPod credentials
+cp backend/.env.example backend/.env
+# Edit backend/.env with your RunPod credentials. It is the only env file:
+# frontend/.env.local and MEYA (ManyMe) link to it.
 ```
 
 ### 2. Start Local Services
@@ -320,7 +321,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## 🔐 Environment Variables
 
-See [`.env.example`](.env.example) for all configuration options.
+See [`backend/.env.example`](backend/.env.example) for all configuration options. With Docker, pass it to Compose: `docker-compose --env-file backend/.env up -d`.
 
 Required for RunPod:
 - `RUNPOD_API_KEY` - Your RunPod API key

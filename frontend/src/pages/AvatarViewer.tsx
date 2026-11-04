@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n';
 import { WebGPURenderer } from '../engine/webgpu_renderer';
 import { SplatLoader } from '../engine/splat_loader';
 import { AnimationStream } from '../engine/animation_stream';
@@ -142,12 +143,12 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
         resizeObs = new ResizeObserver(fitCanvas);
         resizeObs.observe(canvas);
 
-        setStage('Loading avatar data…');
+        setStage(t('viewer.loadingData'));
         const loader    = new SplatLoader();
         const gaussians = await loader.loadFromURL(avatarUrl);
         if (cancelled) { renderer.destroy(); return; }
 
-        setStage('Uploading to GPU…');
+        setStage(t('viewer.uploading'));
         renderer.loadGaussians(gaussians);
         setGaussianCount(gaussians.count);
 
@@ -315,10 +316,10 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
     <div style={css.page}>
       {/* ── top bar ── */}
       <div style={css.topBar}>
-        <button style={css.backBtn} onClick={onBack}>← Back</button>
+        <button style={css.backBtn} onClick={onBack}>{t('viewer.back')}</button>
         <div style={css.titleGroup}>
           <span style={{ fontSize: 20 }}>🧑‍🎤</span>
-          <span style={css.title}>Your 3D Avatar</span>
+          <span style={css.title}>{t('viewer.title')}</span>
         </div>
         <div style={css.badge}>
           {ready
@@ -326,7 +327,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
                 <span style={{ color: ampUi > 0.02 ? '#a78bfa' : '#333' }}>
                   &nbsp;amp {ampUi.toFixed(2)}
                 </span></>
-            : <span style={{ color: '#555' }}>Loading…</span>}
+            : <span style={{ color: '#555' }}>{t('viewer.loading')}</span>}
         </div>
       </div>
 
@@ -364,7 +365,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
               {speakStatus === 'playing' && (
                 <div style={css.playingBadge}>
                   <span style={{ animation: 'pulse 0.6s ease-in-out infinite' }}>🎤</span>
-                  <span>Speaking…</span>
+                  <span>{t('viewer.speaking')}</span>
                   <WaveBar /><WaveBar delay={0.1} /><WaveBar delay={0.2} /><WaveBar delay={0.15} />
                 </div>
               )}
@@ -373,7 +374,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
         </div>
 
         {ready && (
-          <p style={css.hint}>🖱 Drag to rotate &nbsp;·&nbsp; Scroll to zoom</p>
+          <p style={css.hint}>{t('viewer.hint')}</p>
         )}
 
         {/* ── action buttons ── */}
@@ -381,8 +382,8 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
           <div style={css.actions}>
             <ActionButton
               emoji="🎤"
-              label="Make it Talk"
-              sub={speakStatus === 'playing' ? 'Speaking…' : 'ElevenLabs TTS'}
+              label={t('viewer.talk')}
+              sub={speakStatus === 'playing' ? t('viewer.speaking') : 'ElevenLabs TTS'}
               primary
               active={showSpeak}
               loading={speakStatus === 'loading'}
@@ -390,14 +391,14 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
             />
             <ActionButton
               emoji="💾"
-              label="Download PLY"
-              sub="Raw Gaussian file"
+              label={t('viewer.download')}
+              sub={t('viewer.downloadSub')}
               onClick={handleDownload}
             />
             <ActionButton
               emoji="🔄"
-              label="New Avatar"
-              sub="Upload another photo"
+              label={t('viewer.new')}
+              sub={t('viewer.newSub')}
               onClick={onBack}
             />
           </div>
@@ -408,20 +409,20 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
           <div style={css.speakPanel}>
             {/* suggestion chips */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' as const }}>
-              <span style={{ fontSize: 11, color: '#444', flexShrink: 0 }}>Try:</span>
+              <span style={{ fontSize: 11, color: '#444', flexShrink: 0 }}>{t('viewer.try')}</span>
               {suggestions.map((line, i) => (
                 <button key={i} onClick={() => setSpeakText(line)} style={css.suggChip}
                   title={line}>
                   {line.length > 42 ? line.slice(0, 42) + '…' : line}
                 </button>
               ))}
-              <button onClick={shuffleSuggestions} style={css.shuffleBtn} title="More suggestions">🔀</button>
+              <button onClick={shuffleSuggestions} style={css.shuffleBtn} title={t('viewer.more')}>🔀</button>
             </div>
             <textarea
               id="speak-text"
               name="speak-text"
               style={css.speakTextarea}
-              placeholder="Hello! I'm your personal 3D avatar…"
+              placeholder={t('viewer.placeholder')}
               value={speakText}
               onChange={e => setSpeakText(e.target.value)}
               rows={3}
@@ -431,7 +432,7 @@ export const AvatarViewer: React.FC<AvatarViewerProps> = ({
               <select
                 id="voice-select"
                 name="voice-select"
-                aria-label="Voice"
+                aria-label={t('viewer.voice')}
                 style={css.voiceSelect}
                 value={voiceId}
                 onChange={e => setVoiceId(e.target.value)}

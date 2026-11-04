@@ -38,13 +38,15 @@ from typing import Callable
 
 from PIL import Image
 
+from ..config import settings
+
 logger = logging.getLogger(__name__)
 
 # Legacy model tried when the configured model is not available on the account
 GEMINI_LEGACY_IMAGE_MODEL = "gemini-2.5-flash-image"
 
 # OpenAI fallback — tried in order until one model is accepted by the account
-OPENAI_IMAGE_MODELS = ["gpt-image-2", "gpt-image-1"]
+OPENAI_IMAGE_MODELS = list(dict.fromkeys([settings.OPENAI_IMAGE_MODEL, "gpt-image-2", "gpt-image-1"]))
 
 # (angle_key, yaw_deg, pitch_deg)
 VIEW_ANGLES: list[tuple[str, int, int]] = [
@@ -148,6 +150,8 @@ def gemini_endpoint(model: str) -> tuple[str, dict]:
     global _vertex_broken
     from ..config import settings
 
+    if not settings.GOOGLE_ENABLED:
+        raise RuntimeError("Google desactivado (GOOGLE_ENABLED=false)")
     if settings.GCP_PROJECT_ID:
         if not _vertex_broken:
             try:

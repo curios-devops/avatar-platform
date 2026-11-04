@@ -12,6 +12,7 @@
  *    (silero) queda como mejora.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n';
 
 type Estado = 'idle' | 'escuchando' | 'hablando' | 'pensando';
 
@@ -23,17 +24,19 @@ interface Props { serverUrl: string; avatarId?: string; onBack?: () => void }
 
 /** Audio streaming: anexa chunks MP3 (b64) a un MediaSource en vivo. */
 class MseAudio {
-  private audio = new Audio();
+  private audio: HTMLAudioElement = document.createElement('audio');
   private ms: MediaSource | null = null;
   private sb: SourceBuffer | null = null;
   private queue: Uint8Array[] = [];
   private ended = false;
+  onEnded: (() => void) | null = null;
 
   start() {
     this.stop();
     this.ms = new MediaSource();
     this.ended = false;
     this.audio = new Audio(URL.createObjectURL(this.ms));
+    this.audio.onended = () => this.onEnded?.();
     this.audio.play().catch(() => {});
     this.ms.addEventListener('sourceopen', () => {
       if (!this.ms || this.sb) return;
@@ -73,7 +76,8 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
   const [wsUp, setWsUp] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const mseRef = useRef(new MseAudio());
+  const mseRef = useRef<MseAudio>(null as unknown as MseAudio);
+  if (!mseRef.current) mseRef.current = new MseAudio();  // una sola instancia, no una por render
   const recRef = useRef<MediaRecorder | null>(null);
   const vidA = useRef<HTMLVideoElement>(null);
   const vidB = useRef<HTMLVideoElement>(null);
@@ -81,6 +85,7 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
   const clipShown = useRef('');
   const chunkQueue = useRef<string[]>([]);
   const playingChunk = useRef(false);
+  const sawAudio = useRef(false);
   const lastResponse = useRef<string[]>([]);   // urls de los chunks de la última respuesta (repetir/compartir)
   const [zoom, setZoom] = useState(1);          // zoom digital 1-2x (A4)
   const [canShare, setCanShare] = useState(false);
@@ -105,7 +110,7 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
       nxt.style.opacity = '1'; cur.style.opacity = '0';
       activeVid.current = activeVid.current === 'a' ? 'b' : 'a';
       clipShown.current = `__chunk__`;
-    }).catch(() => { playingChunk.current = false; });
+    }).catch(() => { playingChunk.current = false; playNextChunk(); });
   };
 
   const clipUrl = (name: string) => `${serverUrl}/dev-storage/clips/${avatarId}/${name}.mp4`;
@@ -125,12 +130,15 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
     }).catch(() => {});
   };
 
-  useEffect(() => { showClip(CLIP_FOR[estado]); }, [estado]);
+  // un chunk con lip-sync manda sobre el loop: sin esta guarda el cambio de
+  // estado le pisa el src (AbortError) o lo oculta mientras sigue sonando
+  useEffect(() => { if (!playingChunk.current) showClip(CLIP_FOR[estado]); }, [estado]);
 
   // ── WebSocket del orquestador ──────────────────────────────────────────
   useEffect(() => {
     const ws = new WebSocket(`${serverUrl.replace(/^http/, 'ws')}/api/v1/converse/ws`);
     wsRef.current = ws;
+    mseRef.current.onEnded = () => { setEstado('idle'); setSubtitulo(''); };
     ws.onopen = () => setWsUp(true);
     ws.onclose = () => setWsUp(false);
     ws.onmessage = (ev) => {
@@ -152,13 +160,20 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
         playNextChunk();
       } else if (m.audio_chunk) {
         if (m.lat_primer_chunk_ms != null) mseRef.current.start();
+        sawAudio.current = true;
         mseRef.current.append(m.audio_chunk);
         setEstado('hablando');
         if (m.texto_frase) setSubtitulo(m.texto_frase);
       } else if (m.estado === 'escuchando') {
         setEstado('escuchando');
       } else if (m.estado === 'idle') {
-        if (m.fin_de_respuesta) { mseRef.current.end(); setEstado('idle'); setSubtitulo(''); }
+        if (m.fin_de_respuesta) {
+          // fin_de_respuesta = el servidor terminó de ENVIAR, no de sonar: el
+          // regreso a idle lo hacen audio.onended o el onended del último chunk
+          mseRef.current.end();
+          if (!playingChunk.current && !chunkQueue.current.length && !sawAudio.current) { setEstado('idle'); setSubtitulo(''); }
+          sawAudio.current = false;
+        }
         else setEstado('pensando');
       }
     };
@@ -255,7 +270,7 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
       const blob = await resp.blob();
       const file = new File([blob], 'mi-avatar.mp4', { type: 'video/mp4' });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Mi avatar' });
+        await navigator.share({ files: [file], title: t('feed.shareTitle') });
       } else {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = 'mi-avatar.mp4'; a.click();
@@ -280,20 +295,20 @@ export const FeedMode: React.FC<Props> = ({ serverUrl, avatarId = 'demo', onBack
         {subtitulo && <div style={S.subtitle}>{subtitulo}</div>}
         {onBack && <button style={S.back} onClick={onBack}>←</button>}
         {zoom > 1.02 && <button style={S.zoomReset} onClick={onDouble}>{zoom.toFixed(1)}× ✕</button>}
-        {!wsUp && <div style={S.offline}>conectando…</div>}
+        {!wsUp && <div style={S.offline}>{t('feed.connecting')}</div>}
 
         {/* barra de acciones (A4) */}
         <div style={S.actions}>
-          <button style={S.action} onClick={repetir} disabled={!canShare} title="Repetir respuesta">↺</button>
-          <button style={S.action} onClick={compartir} disabled={!canShare} title="Compartir clip">⤴</button>
+          <button style={S.action} onClick={repetir} disabled={!canShare} title={t('feed.repeat')}>↺</button>
+          <button style={S.action} onClick={compartir} disabled={!canShare} title={t('feed.share')}>⤴</button>
           <button style={{ ...S.action, ...S.action3d }} disabled
-                  title="Ver en 3D — próximamente">⬚</button>
+                  title={t('feed.view3d')}>⬚</button>
         </div>
       </div>
       <div style={S.controls}>
         <input
           id="feed-text" name="feed-text" style={S.input}
-          placeholder="Escribe… (o mantén pulsado el micro)"
+          placeholder={t('feed.placeholder')}
           value={texto} onChange={e => setTexto(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && enviarTexto()}
         />

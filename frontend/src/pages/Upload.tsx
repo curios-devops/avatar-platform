@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { MultiViewOrbit } from '../components/MultiViewOrbit';
+import { t, type Key } from '../i18n';
 
 interface UploadProps {
   serverUrl: string;
@@ -7,50 +8,38 @@ interface UploadProps {
 }
 
 // ── constants ──────────────────────────────────────────────────────────────────
-const STEP_LABELS: Record<string, string> = {
-  downloading:     'Getting ready…',
-  ingest:          'Checking your photo…',
-  preprocess:      'Polishing the image…',
-  lam_reconstruct: 'Sculpting your 3D head on the GPU…',
-  lhm_reconstruct: 'Sculpting your 3D body on the GPU…',
-  multiview:       'Generating multiple views…',
-  flame_fit:       'Mapping your face…',
-  reconstruct:     'Sculpting your 3D avatar…',
-  rig:             'Rigging the skeleton…',
-  package:         'Packing the bundle…',
-  publish:         'Almost there…',
-  generating:      'Imagining your character…',
-};
+const stageLabel = (stage: string) =>
+  stage ? t(`stage.${stage}` as Key) : t('stage.starting');
 
 // GPU one-shot flow (LAM head / LHM body) — the default since 2026-07.
 const gpuSteps = (reconstructKey: string) => [
-  { key: 'downloading',   icon: '⬇️', label: 'Download' },
-  { key: 'ingest',        icon: '🔍', label: 'Check' },
-  { key: 'preprocess',    icon: '✨', label: 'Polish' },
-  { key: reconstructKey,  icon: '🧊', label: '3D sculpt' },
-  { key: 'publish',       icon: '🚀', label: 'Publish' },
+  { key: 'downloading',   icon: '⬇️', label: t('step.downloading') },
+  { key: 'ingest',        icon: '🔍', label: t('step.ingest') },
+  { key: 'preprocess',    icon: '✨', label: t('step.preprocess') },
+  { key: reconstructKey,  icon: '🧊', label: t('step.sculpt') },
+  { key: 'publish',       icon: '🚀', label: t('step.publish') },
 ];
 
 // Legacy multiview/MICA fallback — only shown if the backend actually
 // enters one of its stages (LAM failure fallback).
 const LEGACY_STEPS = [
-  { key: 'downloading', icon: '⬇️', label: 'Download' },
-  { key: 'ingest',      icon: '🔍', label: 'Check' },
-  { key: 'preprocess',  icon: '✨', label: 'Polish' },
-  { key: 'multiview',   icon: '🔄', label: 'Multi-view' },
-  { key: 'flame_fit',   icon: '🗺️', label: 'Map face' },
-  { key: 'reconstruct', icon: '🧊', label: '3D sculpt' },
-  { key: 'rig',         icon: '🦴', label: 'Rig' },
-  { key: 'package',     icon: '📦', label: 'Pack' },
-  { key: 'publish',     icon: '🚀', label: 'Publish' },
+  { key: 'downloading', icon: '⬇️', label: t('step.downloading') },
+  { key: 'ingest',      icon: '🔍', label: t('step.ingest') },
+  { key: 'preprocess',  icon: '✨', label: t('step.preprocess') },
+  { key: 'multiview',   icon: '🔄', label: t('step.multiview') },
+  { key: 'flame_fit',   icon: '🗺️', label: t('step.flame_fit') },
+  { key: 'reconstruct', icon: '🧊', label: t('step.sculpt') },
+  { key: 'rig',         icon: '🦴', label: t('step.rig') },
+  { key: 'package',     icon: '📦', label: t('step.package') },
+  { key: 'publish',     icon: '🚀', label: t('step.publish') },
 ];
 const LEGACY_ONLY = new Set(['multiview', 'flame_fit', 'reconstruct', 'rig', 'package']);
 
 type Framing = 'head' | 'half' | 'full';
 const FRAMING_META: Record<Framing, { label: string; emoji: string }> = {
-  head: { label: 'Cabeza',         emoji: '🙂' },
-  half: { label: 'Medio cuerpo',   emoji: '🧍‍♂️' },
-  full: { label: 'Cuerpo completo', emoji: '🕴️' },
+  head: { label: t('framing.head'), emoji: '🙂' },
+  half: { label: t('framing.half'), emoji: '🧍‍♂️' },
+  full: { label: t('framing.full'), emoji: '🕴️' },
 };
 interface PhotoAnalysis {
   framing: Framing;
@@ -59,13 +48,14 @@ interface PhotoAnalysis {
   tiers_available: Record<Framing, boolean>;
 }
 
+// `label` es el prompt que recibe el backend (inglés); `name` es lo que se muestra
 const CHARACTER_PRESETS = [
-  { label: 'Talking Monkey',  emoji: '🐒' },
-  { label: 'Friendly Robot',  emoji: '🤖' },
-  { label: 'Cute Dragon',     emoji: '🐉' },
-  { label: 'Anime Hero',      emoji: '🌸' },
-  { label: 'Space Explorer',  emoji: '🚀' },
-  { label: 'Wizard',          emoji: '🧙' },
+  { label: 'Talking Monkey',  emoji: '🐒', name: t('preset.monkey') },
+  { label: 'Friendly Robot',  emoji: '🤖', name: t('preset.robot') },
+  { label: 'Cute Dragon',     emoji: '🐉', name: t('preset.dragon') },
+  { label: 'Anime Hero',      emoji: '🌸', name: t('preset.anime') },
+  { label: 'Space Explorer',  emoji: '🚀', name: t('preset.space') },
+  { label: 'Wizard',          emoji: '🧙', name: t('preset.wizard') },
 ];
 
 const STYLES = [
@@ -75,13 +65,12 @@ const STYLES = [
   { name: '3D Render', emoji: '💎' },
 ];
 
+const KNOWN_ERRORS = ['no_face', 'multiple_faces', 'too_small', 'off_angle', 'invalid_format',
+  'lam_failed', 'lam_unavailable', 'consent_required'] as const;
+
 function friendlyError(raw: string): string {
-  if (raw.includes('no_face'))        return "We couldn't find a face. Try a clear front-facing photo.";
-  if (raw.includes('multiple_faces')) return "We see more than one person. Use a solo photo.";
-  if (raw.includes('too_small'))      return "Photo too small — try a higher-quality image.";
-  if (raw.includes('off_angle'))      return "Face is turned too far sideways. Look straight at the camera.";
-  if (raw.includes('invalid_format')) return "Unsupported format. Please use JPEG or PNG.";
-  return "Something went wrong. Please try again.";
+  const code = KNOWN_ERRORS.find(c => raw.includes(c));
+  return code ? t(`err.${code}`) : t('err.generic');
 }
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -133,6 +122,9 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
   const [customDesc, setCustomDesc] = useState('');
   const [style, setStyle]         = useState('Cartoon');
 
+  // Twin de uno mismo: foto y vídeo de una persona real exigen consentimiento
+  const [consent, setConsent] = useState(false);
+
   // pipeline
   const [status, setStatus]     = useState<'idle' | 'building' | 'ready' | 'failed'>('idle');
   const [progress, setProgress] = useState(0);
@@ -157,7 +149,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
       camStreamRef.current = s;
       if (camVideoRef.current) { camVideoRef.current.srcObject = s; camVideoRef.current.play(); }
       setCamActive(true);
-    } catch { alert('Camera not available.'); }
+    } catch { alert(t('err.camera')); }
   };
 
   const stopPhotoCamera = useCallback(() => {
@@ -229,7 +221,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
       setAnalysis(a => (a ? { ...a, framing: target, quality_ok: true, issues: [] } : a));
       setTier(target);
     } catch {
-      setReframeError('No se pudo convertir la foto — prueba otra vez.');
+      setReframeError(t('err.reframe'));
     } finally {
       setReframing(false);
     }
@@ -252,7 +244,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
       rec.start();
       setRecording(true); setRecSecs(0);
       recTimerRef.current = window.setInterval(() => setRecSecs(x => x + 1), 1000);
-    } catch { alert('Microphone not available.'); }
+    } catch { alert(t('err.mic')); }
   };
 
   const stopVoice = useCallback(() => {
@@ -268,7 +260,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
       vidCamStreamRef.current = s;
       if (vidCamRef.current) { vidCamRef.current.srcObject = s; vidCamRef.current.play(); }
       setVidCamActive(true);
-    } catch { alert('Camera or microphone not available.'); }
+    } catch { alert(t('err.camMic')); }
   };
 
   const stopVideoCamera = useCallback(() => {
@@ -332,18 +324,21 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
 
       const endpoint = tab === 'photo' ? '/api/v1/avatar/process' : '/api/v1/avatar/create';
       const body = tab === 'photo'
-        ? JSON.stringify({ photo_url: uploaded, tier })
-        : JSON.stringify({ video_url: uploaded, mode: 'head' });
+        ? JSON.stringify({ photo_url: uploaded, tier, consent })
+        : JSON.stringify({ video_url: uploaded, mode: 'head', consent });
 
       const r = await fetch(`${serverUrl}${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
       });
-      if (!r.ok) throw new Error('Could not start pipeline');
+      if (!r.ok) {
+        const detail = (await r.json().catch(() => ({}))).detail ?? '';
+        throw new Error(String(detail));
+      }
       const { id } = await r.json();
       await pollJob(id);
 
     } catch (e) {
-      setError('Something went wrong. Please try again.');
+      setError(friendlyError(e instanceof Error ? e.message : ''));
       setStatus('failed');
     }
   };
@@ -389,6 +384,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
     setMultiviewImages(null);
     setMvCount(null);
     setPreset(null); setCustomDesc('');
+    setConsent(false);
   };
 
   const switchTab = (t: Tab) => {
@@ -398,8 +394,8 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
   };
 
   const canBuild =
-    (tab === 'photo'   && !!photoFile && !reframing && !analyzing) ||
-    (tab === 'video'   && !!videoFile) ||
+    (tab === 'photo'   && !!photoFile && !reframing && !analyzing && consent) ||
+    (tab === 'video'   && !!videoFile && consent) ||
     (tab === 'imagine' && !!(preset || customDesc.trim()));
 
   // Step pills follow the flow the backend is actually running: the GPU
@@ -417,8 +413,8 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
         <div style={{ ...P.card, textAlign: 'center', maxWidth: 440 }}>
           {/* confetti header */}
           <div style={{ fontSize: 48, marginBottom: 4, animation: 'pop 0.4s ease' }}>🎉</div>
-          <h2 style={P.heroTitle}>Your avatar is ready!</h2>
-          <p style={P.heroSub}>Here's a preview of your new 3D character</p>
+          <h2 style={P.heroTitle}>{t('ready.title')}</h2>
+          <p style={P.heroSub}>{t('ready.sub')}</p>
 
           {/* circular preview */}
           {previewUrl ? (
@@ -445,10 +441,10 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
             style={{ ...P.primaryBtn(false), marginBottom: 10, fontSize: 16, padding: '16px' }}
             onClick={() => onAvatarCreated(resultJobId!, gaussiansUrl!)}
           >
-            View in 3D →
+            {t('ready.view')}
           </button>
           <button onClick={reset} style={P.ghostBtn}>
-            ← Create another avatar
+            {t('ready.another')}
           </button>
         </div>
         <style>{KEYFRAMES}</style>
@@ -462,9 +458,9 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
       <div style={P.page}>
         <div style={{ ...P.card, maxWidth: 480, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12, animation: 'spin 3s linear infinite' }}>⚙️</div>
-          <h2 style={{ ...P.heroTitle, marginBottom: 6 }}>Building your avatar</h2>
+          <h2 style={{ ...P.heroTitle, marginBottom: 6 }}>{t('building.title')}</h2>
           <p style={{ ...P.heroSub, marginBottom: 28 }}>
-            {STEP_LABELS[currentStage] || 'Starting up…'}
+            {stageLabel(currentStage)}
           </p>
 
           {/* circular progress ring */}
@@ -497,7 +493,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
           {multiviewImages && Object.keys(multiviewImages).length > 1 && (
             <div style={{ margin: '0 auto 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <p style={{ ...P.heroSub, marginBottom: 12, fontSize: 12 }}>
-                Analysing multiple angles for better reconstruction
+                {t('building.angles')}
               </p>
               <MultiViewOrbit
                 images={multiviewImages}
@@ -545,21 +541,21 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
       {/* hero */}
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 52, marginBottom: 12, lineHeight: 1 }}>🧑‍🎤</div>
-        <h1 style={P.heroTitle}>Create Your 3D Avatar</h1>
-        <p style={P.heroSub}>Upload a photo, record a video, or just describe your character</p>
+        <h1 style={P.heroTitle}>{t('hero.title')}</h1>
+        <p style={P.heroSub}>{t('hero.sub')}</p>
       </div>
 
       <div style={P.card}>
         {/* tabs */}
         <div style={P.tabBar}>
           {([
-            { id: 'photo',   emoji: '📸', label: 'Photo'   },
-            { id: 'video',   emoji: '🎥', label: 'Video'   },
-            { id: 'imagine', emoji: '✨', label: 'Imagine'  },
-          ] as {id: Tab; emoji: string; label: string}[]).map(t => (
-            <button key={t.id} style={P.tab(tab === t.id)} onClick={() => switchTab(t.id)}>
-              <span>{t.emoji}</span>
-              <span>{t.label}</span>
+            { id: 'photo',   emoji: '📸', label: t('tab.photo')   },
+            { id: 'video',   emoji: '🎥', label: t('tab.video')   },
+            { id: 'imagine', emoji: '✨', label: t('tab.imagine') },
+          ] as {id: Tab; emoji: string; label: string}[]).map(item => (
+            <button key={item.id} style={P.tab(tab === item.id)} onClick={() => switchTab(item.id)}>
+              <span>{item.emoji}</span>
+              <span>{item.label}</span>
             </button>
           ))}
         </div>
@@ -567,7 +563,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
         {/* ── PHOTO ─────────────────────────────────────────────────────────── */}
         {tab === 'photo' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <SectionLabel>Your photo</SectionLabel>
+            <SectionLabel>{t('photo.label')}</SectionLabel>
 
             {camActive ? (
               <div>
@@ -589,8 +585,8 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                 </div>
                 <canvas ref={camCanvasRef} style={{ display: 'none' }} />
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button style={{ ...P.primaryBtn(false), flex: 1 }} onClick={capturePhoto}>📷 Take Photo</button>
-                  <button style={{ ...P.ghostBtn, padding: '10px 16px' }} onClick={stopPhotoCamera}>✕ Cancel</button>
+                  <button style={{ ...P.primaryBtn(false), flex: 1 }} onClick={capturePhoto}>{t('photo.take')}</button>
+                  <button style={{ ...P.ghostBtn, padding: '10px 16px' }} onClick={stopPhotoCamera}>{t('photo.cancel')}</button>
                 </div>
               </div>
             ) : (
@@ -600,12 +596,12 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                   preview={photoLocal}
                   previewType="image"
                   icon="🖼️"
-                  hint="Tap to choose a photo  or  drag & drop"
+                  hint={t('photo.hint')}
                   accept="image/*"
                   onChange={onPhotoChosen}
                 />
                 <button style={P.ghostBtn} onClick={startPhotoCamera}>
-                  📷 Use camera instead
+                  {t('photo.camera')}
                 </button>
               </>
             )}
@@ -619,30 +615,30 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
               }}>
                 {analyzing ? (
                   <span style={{ fontSize: 13, color: '#a78bfa' }}>
-                    🔎 Analizando tu foto…
+                    {t('photo.analyzing')}
                   </span>
                 ) : analysis && (
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 13, color: '#cbd5e1' }}>
-                        {FRAMING_META[analysis.framing].emoji} Detectado:&nbsp;
+                        {FRAMING_META[analysis.framing].emoji} {t('photo.detected')}&nbsp;
                         <b>{FRAMING_META[analysis.framing].label}</b>
                       </span>
                       {analysis.quality_ok
-                        ? <span style={{ fontSize: 12, color: '#4ade80' }}>✓ foto válida</span>
+                        ? <span style={{ fontSize: 12, color: '#4ade80' }}>{t('photo.valid')}</span>
                         : <span style={{ fontSize: 12, color: '#fbbf24' }}>
-                            ⚠️ {analysis.issues.join(' · ') || 'revisa la foto'}
+                            ⚠️ {analysis.issues.join(' · ') || t('photo.check')}
                           </span>}
                     </div>
 
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {(Object.keys(FRAMING_META) as Framing[]).map(t => {
-                        const available = analysis.tiers_available[t];
-                        const selected = tier === t;
+                      {(Object.keys(FRAMING_META) as Framing[]).map(ft => {
+                        const available = analysis.tiers_available[ft];
+                        const selected = tier === ft;
                         return (
-                          <button key={t} disabled={!available || reframing}
-                            onClick={() => setTier(t)}
-                            title={available ? '' : 'Disponible próximamente'}
+                          <button key={ft} disabled={!available || reframing}
+                            onClick={() => setTier(ft)}
+                            title={available ? '' : t('photo.soon')}
                             style={{
                               flex: 1, padding: '8px 6px', borderRadius: 9,
                               fontSize: 12, fontFamily: 'inherit',
@@ -652,7 +648,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                               border: `1px solid ${selected ? 'rgba(167,139,250,0.7)' : '#1e1e2e'}`,
                               color: selected ? '#e9d5ff' : '#9ca3af',
                             }}>
-                            {FRAMING_META[t].emoji} {FRAMING_META[t].label}
+                            {FRAMING_META[ft].emoji} {FRAMING_META[ft].label}
                           </button>
                         );
                       })}
@@ -667,14 +663,13 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                           border: '1px solid rgba(167,139,250,0.5)', color: '#e9d5ff',
                         }}>
                         {reframing
-                          ? '🎨 Convirtiendo la foto con IA…'
-                          : `🎨 Convertir foto a ${FRAMING_META[tier].label.toLowerCase()} con IA`}
+                          ? t('photo.converting')
+                          : t('photo.convert', { tier: FRAMING_META[tier].label.toLowerCase() })}
                       </button>
                     )}
                     {tier !== analysis.framing && analysis.tiers_available[tier] && !reframing && (
                       <span style={{ fontSize: 11, color: '#64748b' }}>
-                        La foto es «{FRAMING_META[analysis.framing].label.toLowerCase()}» — conviértela
-                        primero para un mejor resultado, o genera tal cual.
+                        {t('photo.convertHint', { framing: FRAMING_META[analysis.framing].label.toLowerCase() })}
                       </span>
                     )}
                     {reframeError && (
@@ -686,16 +681,16 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
             )}
 
             <Divider />
-            <SectionLabel optional>Voice for your avatar (optional)</SectionLabel>
+            <SectionLabel optional>{t('voice.label')}</SectionLabel>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {!recording
-                ? <button style={P.ghostBtn} onClick={startVoice}>🎙 Record voice</button>
+                ? <button style={P.ghostBtn} onClick={startVoice}>{t('voice.record')}</button>
                 : <button style={{ ...P.ghostBtn, borderColor: '#ef4444', color: '#f87171', animation: 'pulse 1s infinite' }} onClick={stopVoice}>
-                    ⏹ Stop — {fmt(recSecs)}
+                    {t('voice.stop')} · {fmt(recSecs)}
                   </button>
               }
               <label style={{ ...P.ghostBtn, cursor: 'pointer', position: 'relative' as const }}>
-                📁 Upload audio
+                {t('voice.upload')}
                 <input type="file" accept="audio/*" style={P.hiddenInput}
                   onChange={e => { const f = e.target.files?.[0]; if (f) setAudioLocal(URL.createObjectURL(f)); }} />
               </label>
@@ -711,7 +706,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
         {tab === 'video' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <InfoBanner>
-              Your voice is captured automatically — just speak naturally while recording 🎤
+              {t('video.banner')}
             </InfoBanner>
 
             {vidCamActive ? (
@@ -732,8 +727,8 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                   {!recordingVid
-                    ? <button style={{ ...P.primaryBtn(false), flex: 1 }} onClick={startVideoRec}>● Start Recording</button>
-                    : <button style={{ ...P.ghostBtn, flex: 1, borderColor: '#ef4444', color: '#f87171' }} onClick={stopVideoRec}>⏹ Stop Recording</button>
+                    ? <button style={{ ...P.primaryBtn(false), flex: 1 }} onClick={startVideoRec}>{t('video.start')}</button>
+                    : <button style={{ ...P.ghostBtn, flex: 1, borderColor: '#ef4444', color: '#f87171' }} onClick={stopVideoRec}>{t('video.stop')}</button>
                   }
                   <button style={{ ...P.ghostBtn, padding: '10px 16px' }} onClick={stopVideoCamera}>✕</button>
                 </div>
@@ -745,21 +740,21 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                   preview={videoLocal}
                   previewType="video"
                   icon="🎬"
-                  hint="Tap to choose a video  or  drag & drop"
+                  hint={t('video.hint')}
                   accept="video/*"
                   onChange={f => { setVideoFile(f); setVideoLocal(URL.createObjectURL(f)); }}
                 />
                 <button style={P.ghostBtn} onClick={startVideoCamera}>
-                  🎥 Record with camera & mic
+                  {t('video.camera')}
                 </button>
               </>
             )}
 
             <Divider />
-            <SectionLabel optional>What should your avatar say? (optional)</SectionLabel>
+            <SectionLabel optional>{t('video.say')}</SectionLabel>
             <textarea
               style={P.textarea}
-              placeholder={`e.g. Hello! I'm so excited to meet you…`}
+              placeholder={t('video.sayPlaceholder')}
               value={vidPrompt}
               onChange={e => setVidPrompt(e.target.value)}
               rows={2}
@@ -770,7 +765,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
         {/* ── IMAGINE ───────────────────────────────────────────────────────── */}
         {tab === 'imagine' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <SectionLabel>Pick a character</SectionLabel>
+            <SectionLabel>{t('imagine.pick')}</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {CHARACTER_PRESETS.map(p => (
                 <button key={p.label}
@@ -784,22 +779,22 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                   onClick={() => { setPreset(p.label); setCustomDesc(''); }}>
                   <span style={{ fontSize: 28 }}>{p.emoji}</span>
                   <span style={{ fontSize: 11, color: preset === p.label ? '#a78bfa' : '#555', fontWeight: 500 }}>
-                    {p.label}
+                    {p.name}
                   </span>
                 </button>
               ))}
             </div>
 
-            <Divider label="or describe your own" />
+            <Divider label={t('imagine.or')} />
             <textarea
               style={P.textarea}
-              placeholder="e.g. a happy golden retriever wearing sunglasses"
+              placeholder={t('imagine.placeholder')}
               value={customDesc}
               onChange={e => { setCustomDesc(e.target.value); setPreset(null); }}
               rows={2}
             />
 
-            <SectionLabel>Style</SectionLabel>
+            <SectionLabel>{t('imagine.style')}</SectionLabel>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {STYLES.map(s => (
                 <button key={s.name}
@@ -811,7 +806,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                     display: 'flex', gap: 5, alignItems: 'center',
                   }}
                   onClick={() => setStyle(s.name)}>
-                  {s.emoji} {s.name}
+                  {s.emoji} {t(`style.${s.name}` as Key)}
                 </button>
               ))}
             </div>
@@ -822,10 +817,27 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
                 border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10,
                 fontSize: 13, color: '#888',
               }}>
-                ✨ Generating: <strong style={{ color: '#a78bfa' }}>{preset ?? customDesc}</strong> · {style}
+                ✨ {t('imagine.generating')} <strong style={{ color: '#a78bfa' }}>{CHARACTER_PRESETS.find(p => p.label === preset)?.name ?? customDesc}</strong> · {t(`style.${style}` as Key)}
               </div>
             )}
           </div>
+        )}
+
+        {/* ── consentimiento Twin (foto o vídeo de una persona real) ─────────── */}
+        {tab !== 'imagine' && (
+          <label style={{
+            marginTop: 20, display: 'flex', gap: 10, alignItems: 'flex-start',
+            padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+            border: `1px solid ${consent ? 'rgba(167,139,250,0.5)' : '#1e1e2e'}`,
+            background: 'rgba(255,255,255,0.02)', fontSize: 13, lineHeight: 1.5, color: '#cbd5e1',
+          }}>
+            <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}
+              style={{ marginTop: 3, width: 16, height: 16, accentColor: '#a78bfa', flexShrink: 0 }} />
+            <span>
+              {t('consent.label')}
+              <span style={{ display: 'block', color: '#64748b', fontSize: 12, marginTop: 2 }}>{t('consent.help')}</span>
+            </span>
+          </label>
         )}
 
         {/* ── error ─────────────────────────────────────────────────────────── */}
@@ -846,7 +858,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
           disabled={!canBuild}
           onClick={build}
         >
-          {tab === 'imagine' ? '✨ Generate My Avatar' : '🚀 Create My Avatar'}
+          {tab === 'imagine' ? t('build.imagine') : t('build.create')}
         </button>
       </div>
 
@@ -859,7 +871,7 @@ export const Upload: React.FC<UploadProps> = ({ serverUrl, onAvatarCreated }) =>
 const SectionLabel: React.FC<{ children: React.ReactNode; optional?: boolean }> = ({ children, optional }) => (
   <span style={{ fontSize: 13, color: '#666', display: 'block', fontWeight: 500 }}>
     {children}
-    {optional && <span style={{ color: '#333', fontWeight: 400, marginLeft: 6 }}>(optional)</span>}
+    {optional && <span style={{ color: '#333', fontWeight: 400, marginLeft: 6 }}>{t('optional')}</span>}
   </span>
 );
 
@@ -912,7 +924,7 @@ const DropZone: React.FC<{
           marginTop: 4, padding: '4px 12px', borderRadius: 20,
           background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)',
           fontSize: 11, color: '#a78bfa',
-        }}>Browse files</span>
+        }}>{t('browse')}</span>
       </div>
     )}
     {hasFile && (
@@ -921,7 +933,7 @@ const DropZone: React.FC<{
         background: 'rgba(167,139,250,0.2)', padding: '3px 10px',
         borderRadius: 20, fontSize: 11, color: '#a78bfa',
       }}>
-        ✓ Tap to change
+        {t('change')}
       </div>
     )}
   </label>

@@ -46,6 +46,8 @@ async def stream_tokens(user_text: str, history: list[dict] | None = None) -> As
     fb = settings.ORCH_LLM_FALLBACK.lower()
     if fb and fb not in order:
         order.append(fb)
+    if not settings.gemini_enabled:  # GOOGLE_ENABLED=false o sin credenciales
+        order = [p for p in order if p != "gemini"] or ["openai"]
 
     for i, provider in enumerate(order):
         agen = _STREAMS[provider](user_text, history)
