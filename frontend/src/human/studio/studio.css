@@ -183,6 +183,9 @@
 .hanger .img { pointer-events: none; position: absolute; left: -20%; right: -20%; top: 30px; bottom: 0; filter: drop-shadow(0 22px 18px rgba(0, 0, 0, .3)); }
 /* frames keep the garment's height, so front and profile line up when they cross-fade */
 .hanger .turn { position: absolute; inset: 0; background: center top / auto 100% no-repeat; transform-origin: 50% 0; }
+.hanger.fit-box .img { left: 6%; right: 6%; bottom: 18%; }
+.hanger.fit-box .turn { background-size: contain; }
+.hanger.fit-box .label { top: calc(82% + 1.6vh); } /* hair and extras are as wide as tall in profile */
 .hanger .nil { position: absolute; inset: 10% 30% 50%; display: grid; place-items: center; font-size: 7vh; font-weight: 200; opacity: .7; }
 .hanger .sw { position: absolute; left: 35%; right: 35%; top: 6%; aspect-ratio: 1; border-radius: 999px; }
 .hanger .label { position: absolute; left: 50%; top: calc(100% + 1.6vh); transform: translateX(-50%); padding: 5px 9px; font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; background: #ffe600; color: #111; opacity: 0; transition: opacity .3s; }

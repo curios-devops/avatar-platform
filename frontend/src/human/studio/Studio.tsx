@@ -34,6 +34,14 @@ const PART_LABEL: Record<string, string> = {
   clothes: L('OUTFIT', 'ROPA'), shoes: L('SHOES', 'ZAPATOS'), hat: L('HAT', 'SOMBRERO'), hair: L('HAIR', 'PELO'),
   accessory: L('EXTRAS', 'ACCESORIOS'), body: L('FACE · BODY', 'CARA · CUERPO'), eyes: L('EYES', 'OJOS'), eyebrows: L('FACE', 'CARA'),
 };
+/** "cortu shaggy green hair" → "Shaggy green", "long01" → "Long 01": the CC0 packs name hair by file. */
+const hairName = (label: string) => {
+  const t = label.replace(/^(cortu|culturalibre|elvs|toigo|sonntag78|o4saken|faydaen|littleright|rehmanpolanski)[ _]/, '')
+    .replace(/[_-]+/g, ' ').replace(/\bhair\b/gi, '').replace(/([a-z])(\d+)$/i, '$1 $2').replace(/\s+/g, ' ').trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+/** The closet's frames for one cut-out: front, 30°, 60°, profile (see Generate). */
+const turns = (name: string) => ANGLES.map((d) => cut(d ? `${name}_a${d}` : name));
 const STARTER = ['male_casualsuit06', 'shoes05']; // white tee + jeans, white sneakers (fits any body)
 const family = (id: Accessory['id']) => (id === 'hoops' || id === 'studs' ? 'ears' : 'eyes');
 
@@ -236,16 +244,16 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
     if (!catalog) return { items: [], ids: [] };
     const none = (cat: string): ArcItem => ({ key: `none-${cat}`, title: L('None', 'Ninguno'), none: true });
     if (fitTab === 'accessories') {
-      return { items: [none('acc'), ...ACCESSORIES.map((a) => ({ key: a.id, title: a.name, img: cut(`acc_${a.id}`) }))], ids: [null, ...ACCESSORIES.map((a) => a.id)] };
+      return { items: [none('acc'), ...ACCESSORIES.map((a) => ({ key: a.id, title: a.name, img: cut(`acc_${a.id}`), turns: turns(`acc_${a.id}`) }))], ids: [null, ...ACCESSORIES.map((a) => a.id)] };
     }
     if (fitTab === 'hair') {
-      return { items: [{ key: 'bald', title: L('No hair', 'Sin pelo'), none: true }, ...catalog.hair.map((h) => ({ key: h.id, title: h.label.replace(/^(cortu|culturalibre|elvs|toigo|sonntag78|o4saken|faydaen|littleright|rehmanpolanski)[ _]/, ''), img: cut(`hair_${h.id}`) }))], ids: ['', ...catalog.hair.map((h) => h.id)] };
+      return { items: [{ key: 'bald', title: L('No hair', 'Sin pelo'), none: true }, ...catalog.hair.map((h) => ({ key: h.id, title: hairName(h.label), img: cut(`hair_${h.id}`), turns: turns(`hair_${h.id}`) }))], ids: ['', ...catalog.hair.map((h) => h.id)] };
     }
     const list = catalog.clothes.filter((c) => categoryOf(c.id) === fitTab);
     const sub = { outfits: L('Outfit', 'Conjunto'), shoes: L('Shoes', 'Zapatos'), hats: L('Hat', 'Sombrero') }[fitTab as 'outfits'];
     const items: HangItem[] = list.map((c) => ({
       key: c.id, title: GARMENT_NAMES[c.id] ?? c.label, sub, img: cut(`garment_${c.id}`),
-      turns: fitTab === 'outfits' ? ANGLES.map((d) => cut(d ? `garment_${c.id}_a${d}` : `garment_${c.id}`)) : undefined,
+      turns: turns(`garment_${c.id}`),
     }));
     return fitTab === 'outfits' ? { items, ids: list.map((c) => c.id) } : { items: [none(fitTab), ...items], ids: [null, ...list.map((c) => c.id)] };
   }, [catalog, fitTab]);
@@ -440,7 +448,7 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
       {showArc && catalog && (mode === 'character'
         ? <Arc key="chars" ref={arc} items={charItems} selected={charSelected} variant="figure" onSettle={useCharacter} />
         : <Arc key={`fit-${fitTab}`} ref={arc} items={fitItems.items} selected={fitSelected} variant="card" onSettle={onFitSettle} />)}
-      {!showArc && catalog && <Hanger key={`hang-${fitTab}`} ref={arc} items={fitItems.items} selected={Math.max(0, fitSelected)} onSettle={onFitSettle} />}
+      {!showArc && catalog && <Hanger key={`hang-${fitTab}`} ref={arc} fit={fitTab === 'hair' || fitTab === 'accessories' ? 'box' : 'height'} items={fitItems.items} selected={Math.max(0, fitSelected)} onSettle={onFitSettle} />}
 
       <div ref={scanRef} className="st-scan" />
       <div ref={host} className="st-canvas" style={{ pointerEvents: 'none' }} data-testid="human-canvas" />

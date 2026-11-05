@@ -26,28 +26,23 @@ export function Generate() {
       for (const c of CHARACTERS) {
         jobs.push({ name: `char_${c.id}`, avatar: fromCharacter(c), isolate: null, frame: () => engine.frame('full') });
       }
+      // everything that hangs in the closet turns from profile (on the rail) to front: one frame every 30°
+      const turning = (name: string, avatar: Avatar, isolate: string[] | null, frame: () => void) => {
+        for (const deg of ANGLES) jobs.push({ name: deg ? `${name}_a${deg}` : name, avatar, isolate, yaw: THREE_DEG * deg, frame });
+      };
       for (const g of cat.clothes) {
         const kind = categoryOf(g.id);
         const base = g.id.startsWith('male_') ? BASE_M : BASE_F;
         const avatar: Avatar = { ...base, clothes: [g.id], tints: {}, accessories: [], hair: kind === 'hats' ? '' : base.hair };
-        jobs.push({ name: `garment_${g.id}`, avatar, isolate: [g.id], yaw: 0,
-          frame: kind === 'shoes' ? () => engine.frameBones('foot.L', 'foot.R', 2.4)
-            : kind === 'hats' ? () => engine.frame('bust') : () => engine.frame('full') });
-        // the closet turns outfits from profile (on the rail) to front (pulled out): one frame every 30°
-        if (kind === 'outfits') {
-          for (const deg of ANGLES.slice(1)) {
-            jobs.push({ name: `garment_${g.id}_a${deg}`, avatar, isolate: [g.id], yaw: THREE_DEG * deg, frame: () => engine.frame('full') });
-          }
-        }
+        turning(`garment_${g.id}`, avatar, [g.id], kind === 'shoes' ? () => engine.frameBones('foot.L', 'foot.R', 2.4)
+          : kind === 'hats' ? () => engine.frame('bust') : () => engine.frame('full'));
       }
       for (const h of cat.hair) {
-        jobs.push({ name: `hair_${h.id}`, avatar: { ...BASE_F, hair: h.id, hairColor: '#ffffff', accessories: [] },
-          isolate: [h.id], frame: () => engine.frame('bust') });
+        turning(`hair_${h.id}`, { ...BASE_F, hair: h.id, hairColor: '#ffffff', accessories: [] }, [h.id], () => engine.frame('bust'));
       }
       for (const id of ['hoops', 'studs', 'glasses', 'sunglasses'] as const) {
         // shown worn, on a face with the ears clear: a lone hoop is a speck on a card
-        jobs.push({ name: `acc_${id}`, avatar: { ...BASE_F, hair: 'ponytail01', accessories: [{ id }] }, isolate: null,
-          frame: () => engine.frame('face') });
+        turning(`acc_${id}`, { ...BASE_F, hair: 'ponytail01', accessories: [{ id }] }, null, () => engine.frame('face'));
       }
       for (const job of jobs) {
         if (stop) return;

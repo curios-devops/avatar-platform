@@ -45,6 +45,24 @@ Fecha: 2026-11-04 · Rama: `exp/three-human` · Decide: Marcelo
 
 **Nuevo en el motor:** aros, pendientes, gafas y gafas de sol en el hueso de la cabeza; teñido real de prendas (de luminancia a color, ya puede pasar a blanco); clic sobre el cuerpo por raycast; encuadre suave según la altura.
 
+**Pelo (2026-11-05, "no se ve realista").** El pelo de MakeHuman es una "cáscara" pintada (2-3 mil polígonos, textura RGBA de 2048 px con el brillo horneado), y se sombreaba como tela. Cambios baratos, sin assets nuevos:
+- **Brillo anisótropo a lo largo de la hebra:** anisotropía GGX de three.js, girada 90° porque las hebras van en `v`, sobre tangentes por vértice.
+- **Variación por mechón** y **teñido por luminancia:** el rubio y el gris dejan de verse sucios.
+- **Alfa más suave en las puntas.**
+
+**Resultado:**
+- **A ojo:** mejora clara. Desaparece la franja plástica de la melena y la coleta deja de verse de plástico. Hoja comparativa en `.triage/hair/ab_zoom.jpg`.
+- **CLIP:** no ve diferencia (márgenes -9,98 antes, -10,22 después), igual que con Callisto.
+- **Descartado:** un primer intento con Kajiya-Kay sobre tangentes de pantalla salía facetado.
+
+**HairDeck** (arXiv 2610.40599, Apache-2.0) **no encaja**:
+- **Pesado:** son cuatro redes (Set DiT de 181 M parámetros y otras), más DINOv3 ViT-L, SAM 3 y BiRefNet. Pesan unos 2,45 GB y necesitan GPU NVIDIA o MPS, más Blender 4.2.
+- **Estilo equivocado:** su salida son unas 69 tarjetas de pelo estilo VRoid/anime, sin texturas.
+
+Lo único reutilizable es la idea de tarjetas barridas con marco de Bishop y el muelle de huesos para que el pelo se mueva. El siguiente paso realista y barato serían tarjetas de pelo CC0 con textura de hebras (MB, no GB).
+
+**Percha:** zapatos, sombreros, pelo y accesorios también giran (4 ángulos cada uno, 246 recortes en total, unos 14 MB).
+
 **Pendiente:**
 - La ropa CC0 de MakeHuman es limitada: 12 conjuntos y casi todo vaqueros y camisetas.
 - El peso alto de Anny apenas se nota en los personajes "corpulentos".

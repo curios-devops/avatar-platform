@@ -9,15 +9,15 @@ const REDUCED = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduce
 
 export type HangItem = ArcItem & { turns?: string[] }; // image per angle in ANGLES order (front … profile)
 
-export const Hanger = forwardRef<ArcHandle, { items: HangItem[]; selected: number; onSettle: (i: number) => void }>(
-  function Hanger({ items, selected, onSettle }, ref) {
+export const Hanger = forwardRef<ArcHandle, { items: HangItem[]; selected: number; onSettle: (i: number) => void; fit?: 'height' | 'box' }>(
+  function Hanger({ items, selected, onSettle, fit = 'height' }, ref) {
     const host = useRef<HTMLDivElement>(null);
     const n = items.length;
     const st = useRef({ pos: Math.max(0, selected), target: Math.max(0, selected), dragging: false, p0: 0, lastX: 0, lastT: 0, vel: 0, settled: selected });
     const settleRef = useRef(onSettle);
     settleRef.current = onSettle;
     const W = () => host.current?.clientWidth || innerWidth;
-    const side = () => W() * 0.075; // spacing between garments in profile
+    const side = () => W() * (fit === 'box' ? 0.105 : 0.075); // spacing between pieces in profile (hair is wide side-on)
     const front = () => W() * 0.15; // the one in front needs room to open up
     const clamp = (v: number) => Math.max(0, Math.min(n - 1, v));
 
@@ -47,7 +47,7 @@ export const Hanger = forwardRef<ArcHandle, { items: HangItem[]; selected: numbe
         s.target = clamp(slot);
         if (s.target !== s.settled) { s.settled = s.target; settleRef.current(s.target); }
       },
-    }), [n]);
+    }), [n, fit]);
 
     useEffect(() => {
       let raf = 0;
@@ -84,10 +84,10 @@ export const Hanger = forwardRef<ArcHandle, { items: HangItem[]; selected: numbe
       };
       raf = requestAnimationFrame(loop);
       return () => cancelAnimationFrame(raf);
-    }, [n]);
+    }, [n, fit]);
 
     return (
-      <div ref={host} className="hanger">
+      <div ref={host} className={`hanger fit-${fit}`}>
         <div className="bar" />
         {items.map((it, i) => (
           <div key={it.key} className="item">

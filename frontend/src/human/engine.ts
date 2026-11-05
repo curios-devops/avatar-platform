@@ -44,6 +44,41 @@ function dye(m: THREE.MeshPhysicalMaterial, hex: string) {
   m.customProgramCacheKey = () => 'dye';
 }
 
+/**
+ * Hair: MakeHuman hair is a few painted shells, so it read as plastic under the cloth shading. Cheap fixes,
+ * no extra assets: an anisotropic highlight along the strands (strands run along v in these textures), a
+ * per-lock brightness jitter to break the shell up, and a luminance dye so blonde or grey keep the painted
+ * detail without going muddy. (A Kajiya-Kay pair on screen-space tangents was tried first: it faceted.)
+ */
+function hairShader(m: THREE.MeshPhysicalMaterial, hex = '#ffffff') {
+  const dye = hex.toLowerCase() !== '#ffffff';
+  const c = new THREE.Color(hex);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uHairDye = { value: c };
+    sh.uniforms.uHairDyeOn = { value: dye ? 1 : 0 };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('void main() {', `uniform vec3 uHairDye;
+uniform float uHairDyeOn;
+float hairHash(float x) { return fract(sin(x * 12.9898) * 43758.5453); }
+void main() {`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+#ifdef USE_MAP
+      float lock = hairHash(floor(vMapUv.x * 220.0));
+      float hl = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+      if (uHairDyeOn > 0.5) diffuseColor.rgb = uHairDye * mix(1.0, clamp(hl / 0.3, 0.3, 1.8), 0.6);
+      diffuseColor.rgb *= 0.88 + 0.24 * lock;
+#endif`)
+      ;
+  };
+  m.customProgramCacheKey = () => 'hair';
+  // strand highlight: three's anisotropic GGX along the strands (v), on per-vertex tangents (see load)
+  m.anisotropy = HAIR.anisotropy;
+  m.anisotropyRotation = HAIR.rotation;
+}
+/** Tunables for the hair A/B (window.__hair from the console). */
+export const HAIR = { anisotropy: 0.85, rotation: Math.PI / 2 };
+(globalThis as any).__hair = HAIR;
+
 export class HumanEngine {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -184,6 +219,10 @@ export class HumanEngine {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         if (mesh.morphTargetDictionary) this.morphMeshes.push(mesh);
+        const kind0 = (mesh.material as THREE.Material)?.userData?.kind;
+        if (kind0 === 'hair' && mesh.geometry.index && mesh.geometry.getAttribute('uv') && !mesh.geometry.getAttribute('tangent')) {
+          mesh.geometry.computeTangents(); // smooth strand frame for the anisotropic highlight
+        }
       }
     });
     // capture the rest pose facing the stage front: the animator's axes are defined in that frame, so a
@@ -406,19 +445,22 @@ export class HumanEngine {
     const m = new THREE.MeshPhysicalMaterial({
       map: diffuse ? await this.tex(diffuse) : null,
       normalMap: extras.normalmapTexture ? await this.tex(extras.normalmapTexture, false) : null,
-      color: kind === 'hair' || kind === 'eyebrows' ? tint(this.look.hairColor) : kind === 'clothes' && !this.look.tints?.[name] ? tint(this.look.clothesColor) : '#ffffff',
-      roughness: kind === 'eyes' ? 0.12 : kind === 'teeth' ? 0.3 : kind === 'hair' ? 0.55 : 0.82,
+      // hair is dyed in its shader (below); a multiply over the painted brown made every colour muddy
+      color: kind === 'eyebrows' ? tint(this.look.hairColor) : kind === 'clothes' && !this.look.tints?.[name] ? tint(this.look.clothesColor) : '#ffffff',
+      roughness: kind === 'eyes' ? 0.12 : kind === 'teeth' ? 0.3 : kind === 'hair' ? 0.72 : 0.82,
       clearcoat: kind === 'eyes' ? 1 : 0,
       // eyes reflect only off the tear film (coat, 4 %); a second base lobe doubled it past the measured 2.5-5.5 % (Callisto)
       specularIntensity: kind === 'eyes' ? 0 : 1,
-      sheen: kind === 'clothes' ? 0.6 : kind === 'hair' ? 0.25 : 0,
+      sheen: kind === 'clothes' ? 0.6 : 0,
       sheenRoughness: 0.7,
       side: cutout ? THREE.DoubleSide : THREE.FrontSide,
-      alphaTest: cutout ? 0.35 : kind === 'clothes' ? 0.5 : 0, // some garments cut holes (hems, laces) with alpha
+      // hair keeps more of its painted tips; alpha-to-coverage feathers them instead of a hard cut
+      alphaTest: kind === 'hair' ? 0.2 : cutout ? 0.35 : kind === 'clothes' ? 0.5 : 0, // some garments cut holes (hems, laces) with alpha
       alphaToCoverage: !!cutout,
       transparent: false,
     });
     m.userData = extras;
+    if (kind === 'hair') { m.roughness = 0.5; m.specularIntensity = 0.4; hairShader(m, this.look.hairColor); }
     const recolor = kind === 'clothes' ? this.look.tints?.[name] : undefined;
     if (recolor && recolor.toLowerCase() !== '#ffffff') dye(m, recolor);
     return m;
@@ -493,7 +535,7 @@ export class HumanEngine {
     const target = a.clone().lerp(b, 0.5);
     const size = Math.max(a.distanceTo(b), 0.12) * pad;
     const dist = size / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
-    const facing = this.root.getWorldDirection(new THREE.Vector3());
+    const facing = new THREE.Vector3(0, 0, 1); // stage front, like frame(): the person turns, not the camera
     this.controls.target.copy(target);
     this.camera.position.copy(target).addScaledVector(facing, dist).add(new THREE.Vector3(0, size * 0.25, 0));
     this.controls.update();
