@@ -186,6 +186,11 @@ export class HumanEngine {
         if (mesh.morphTargetDictionary) this.morphMeshes.push(mesh);
       }
     });
+    // capture the rest pose facing the stage front: the animator's axes are defined in that frame, so a
+    // person turned by the user (or the closet renders) keeps natural arms after a re-bake
+    const yaw = this.root.rotation.y;
+    this.root.rotation.y = 0;
+    this.root.updateMatrixWorld(true);
     model.updateMatrixWorld(true);
     for (const [name, b] of this.bones) {
       const parentWorld = new THREE.Quaternion();
@@ -199,6 +204,7 @@ export class HumanEngine {
       this.armDrop[side] = THREE.MathUtils.clamp(rest + 1.36, 0, 1.6);
     }
     this.anchorAccessories();
+    this.root.rotation.y = yaw;
     await this.setLook(look);
     if (first) this.frame('bust');
   }
@@ -443,6 +449,11 @@ export class HumanEngine {
     this.controls.update();
   }
   private camGoal: { target: THREE.Vector3; pos: THREE.Vector3 } | null = null;
+
+  /** Face a fixed direction (0 = towards the stage front); used for the closet's side views. */
+  setYaw(rad: number) {
+    this.root.rotation.y = rad;
+  }
 
   /** Turn the person on the spot (drag on the body in the studio). */
   turn(rad: number) {

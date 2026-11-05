@@ -7,7 +7,7 @@ import './studio.css';
 import { HumanEngine, type Accessory, type Pick } from '../engine';
 import { Speech } from '../speech';
 import { Arc, type ArcHandle, type ArcItem } from './Arc';
-import { Hanger } from './Hanger';
+import { ANGLES, Hanger, type HangItem } from './Hanger';
 import { liquidGlass } from './liquid';
 import {
   ACCESSORIES, BACKDROPS, CHARACTERS, FACE_GROUPS, FIT_TABS, GARMENT_NAMES, HAIR_TINTS, L, PROMPTS, TINTS, categoryOf, es,
@@ -34,6 +34,7 @@ const PART_LABEL: Record<string, string> = {
   clothes: L('OUTFIT', 'ROPA'), shoes: L('SHOES', 'ZAPATOS'), hat: L('HAT', 'SOMBRERO'), hair: L('HAIR', 'PELO'),
   accessory: L('EXTRAS', 'ACCESORIOS'), body: L('FACE · BODY', 'CARA · CUERPO'), eyes: L('EYES', 'OJOS'), eyebrows: L('FACE', 'CARA'),
 };
+const STARTER = ['male_casualsuit06', 'shoes05']; // white tee + jeans, white sneakers (fits any body)
 const family = (id: Accessory['id']) => (id === 'hoops' || id === 'studs' ? 'ears' : 'eyes');
 
 export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () => void }) {
@@ -53,7 +54,8 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
   const [charTab, setCharTab] = useState<CharTab>('body');
   const [view, setView] = useState<'arc' | 'hanger'>('arc');
   const [backdrop, setBackdrop] = useState('atelier');
-  const [avatar, setAvatar] = useState<Avatar>(() => fromCharacter(CHARACTERS[0]));
+  // everyone starts in the classic white tee and jeans; the character's own outfit is one click away
+  const [avatar, setAvatar] = useState<Avatar>(() => ({ ...fromCharacter(CHARACTERS[0]), clothes: [...STARTER], tints: {}, accessories: [] }));
   const [charId, setCharId] = useState<string | null>(CHARACTERS[0].id);
   const [lastChar, setLastChar] = useState(0);
   const [history, setHistory] = useState<Avatar[]>([]);
@@ -230,7 +232,7 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
   }
 
   // ------------------------------------------------------------------ carousel contents
-  const fitItems = useMemo<{ items: ArcItem[]; ids: (string | null)[] }>(() => {
+  const fitItems = useMemo<{ items: HangItem[]; ids: (string | null)[] }>(() => {
     if (!catalog) return { items: [], ids: [] };
     const none = (cat: string): ArcItem => ({ key: `none-${cat}`, title: L('None', 'Ninguno'), none: true });
     if (fitTab === 'accessories') {
@@ -241,7 +243,10 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
     }
     const list = catalog.clothes.filter((c) => categoryOf(c.id) === fitTab);
     const sub = { outfits: L('Outfit', 'Conjunto'), shoes: L('Shoes', 'Zapatos'), hats: L('Hat', 'Sombrero') }[fitTab as 'outfits'];
-    const items = list.map((c) => ({ key: c.id, title: GARMENT_NAMES[c.id] ?? c.label, sub, img: cut(`garment_${c.id}`) }));
+    const items: HangItem[] = list.map((c) => ({
+      key: c.id, title: GARMENT_NAMES[c.id] ?? c.label, sub, img: cut(`garment_${c.id}`),
+      turns: fitTab === 'outfits' ? ANGLES.map((d) => cut(d ? `garment_${c.id}_a${d}` : `garment_${c.id}`)) : undefined,
+    }));
     return fitTab === 'outfits' ? { items, ids: list.map((c) => c.id) } : { items: [none(fitTab), ...items], ids: [null, ...list.map((c) => c.id)] };
   }, [catalog, fitTab]);
 
@@ -421,9 +426,16 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
       onPointerLeave={() => setCursor('')}>
       <div ref={bgRef} className="st-bg" data-bg={backdrop} />
-      <div ref={ghostRef} className="st-ghost" key={word}>
-        {[...word].map((ch, i) => <span key={i} style={{ animation: `rise 1.1s cubic-bezier(.2,.8,.2,1) ${i * 0.05}s backwards` }}>{ch}</span>)}
-      </div>
+      {showArc ? (
+        <div ref={ghostRef} className="st-ghost" key={word}>
+          {[...word].map((ch, i) => <span key={i} style={{ animation: `rise 1.1s cubic-bezier(.2,.8,.2,1) ${i * 0.05}s backwards` }}>{ch}</span>)}
+        </div>
+      ) : (
+        <div className="st-wall" key={`wall-${fitTab}`}>
+          {(avatar.pheno.gender ?? 0) > 0.6 ? L('men', 'hombre') : (avatar.pheno.gender ?? 0) < 0.4 ? L('women', 'mujer') : L('everyone', 'todos')} /<br />
+          {(FIT_TABS.find((t) => t[0] === fitTab)?.[1] ?? '').toLowerCase()}
+        </div>
+      )}
 
       {showArc && catalog && (mode === 'character'
         ? <Arc key="chars" ref={arc} items={charItems} selected={charSelected} variant="figure" onSettle={useCharacter} />
@@ -448,7 +460,11 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
       </div>
       <div className="st-corner r">
         {mode === 'fitting' && (
-          <button className="chip glass" onClick={() => setView((v) => (v === 'arc' ? 'hanger' : 'arc'))} title={L('Switch view', 'Cambiar vista')}>
+          <button className="chip glass" onClick={() => {
+            // the closet borrows the shop look: cool grey wall, chrome rail
+            if (view === 'arc' && backdrop === 'atelier') setBackdrop('showroom');
+            setView((v) => (v === 'arc' ? 'hanger' : 'arc'));
+          }} title={L('Switch view', 'Cambiar vista')}>
             {view === 'arc' ? <IconHanger /> : <IconArc />}<span>{view === 'arc' ? L('Closet', 'Percha') : L('Arc', 'Arco')}</span>
           </button>
         )}

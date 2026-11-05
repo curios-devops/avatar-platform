@@ -5,6 +5,9 @@ import { HumanEngine } from '../engine';
 import { CHARACTERS, categoryOf } from './presets';
 import { HUMAN_URL, bake, fromCharacter, lookOf, type Avatar, type Catalog } from './avatar';
 
+import { ANGLES } from './Hanger';
+
+const THREE_DEG = Math.PI / 180;
 const BASE_F = fromCharacter(CHARACTERS[0]);
 const BASE_M = fromCharacter(CHARACTERS[13]);
 
@@ -18,7 +21,7 @@ export function Generate() {
     (async () => {
       const cat = (await (await fetch(`${HUMAN_URL}/catalog`)).json()) as Catalog;
       const only = new URLSearchParams(location.search).get('only'); // e.g. only=char or only=hair
-      type Job = { name: string; avatar: Avatar; isolate: string[] | null; frame: () => void };
+      type Job = { name: string; avatar: Avatar; isolate: string[] | null; yaw?: number; frame: () => void };
       const jobs: Job[] = [];
       for (const c of CHARACTERS) {
         jobs.push({ name: `char_${c.id}`, avatar: fromCharacter(c), isolate: null, frame: () => engine.frame('full') });
@@ -27,9 +30,15 @@ export function Generate() {
         const kind = categoryOf(g.id);
         const base = g.id.startsWith('male_') ? BASE_M : BASE_F;
         const avatar: Avatar = { ...base, clothes: [g.id], tints: {}, accessories: [], hair: kind === 'hats' ? '' : base.hair };
-        jobs.push({ name: `garment_${g.id}`, avatar, isolate: [g.id],
+        jobs.push({ name: `garment_${g.id}`, avatar, isolate: [g.id], yaw: 0,
           frame: kind === 'shoes' ? () => engine.frameBones('foot.L', 'foot.R', 2.4)
             : kind === 'hats' ? () => engine.frame('bust') : () => engine.frame('full') });
+        // the closet turns outfits from profile (on the rail) to front (pulled out): one frame every 30°
+        if (kind === 'outfits') {
+          for (const deg of ANGLES.slice(1)) {
+            jobs.push({ name: `garment_${g.id}_a${deg}`, avatar, isolate: [g.id], yaw: THREE_DEG * deg, frame: () => engine.frame('full') });
+          }
+        }
       }
       for (const h of cat.hair) {
         jobs.push({ name: `hair_${h.id}`, avatar: { ...BASE_F, hair: h.id, hairColor: '#ffffff', accessories: [] },
@@ -45,6 +54,7 @@ export function Generate() {
         if (only && !job.name.startsWith(only)) continue;
         try {
           await engine.load(await bake(cat, job.avatar), lookOf(cat, job.avatar));
+          engine.setYaw(job.yaw ?? 0);
           engine.isolate(job.isolate, job.isolate === null);
           job.frame();
           const png = await (await fetch(await engine.cutout())).blob();

@@ -168,15 +168,27 @@
 .fig .tag { position: absolute; left: 50%; bottom: -5.2vh; transform: translateX(-50%); white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--label); opacity: 0; transition: opacity .3s; }
 .fig:hover .tag { opacity: 1; }
 
-/* ---------------------------------------------------------------- hanger rail */
-.hanger { position: absolute; left: 0; right: 34vw; top: 15vh; height: 70vh; z-index: 9; touch-action: pan-y; }
-.hanger .bar { position: absolute; left: -2vw; right: -2vw; top: 0; height: 9px; border-radius: 9px; background: linear-gradient(180deg, #f4f6f8, #a9afb6 55%, #7d838b); box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .45); }
-.hanger .item { position: absolute; top: 4px; width: 12vw; height: 38vh; margin-left: -6vw; transform-origin: 50% 0; will-change: transform; }
-.hanger .hook { position: absolute; left: 50%; top: 0; width: 22px; height: 30px; margin-left: -11px; border: 2.5px solid #2a2a2c; border-bottom: 0; border-radius: 12px 12px 0 0; }
-.hanger .hook::after { content: ''; position: absolute; left: 50%; top: 26px; width: 3px; height: 18px; margin-left: -1.5px; background: #2a2a2c; }
-.hanger .img { position: absolute; left: 0; right: 0; top: 46px; bottom: 0; background: center top / contain no-repeat; filter: drop-shadow(0 18px 18px rgba(0, 0, 0, .28)); }
-.hanger .label { position: absolute; left: 50%; bottom: -3.4vh; transform: translateX(-50%); padding: 5px 9px; font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; background: #ffe600; color: #111; opacity: 0; transition: opacity .3s; }
+/* ---------------------------------------------------------------- hanger rail
+   After a real shop rail: chrome bar across the room, garments in profile, the front one turned to face
+   you with a yellow tag, a debossed section title on the wall above. */
+.hanger { position: absolute; left: 0; right: 0; top: 30vh; height: 46vh; z-index: 9; touch-action: pan-y; }
+.hanger .bar { position: absolute; left: -2vw; right: -2vw; top: 0; height: 8px; border-radius: 8px; background: linear-gradient(180deg, #fbfcfd, #b9bec4 50%, #80868d); box-shadow: 0 8px 16px -8px rgba(0, 0, 0, .5); }
+.hanger .item { pointer-events: none; }
+.hanger .hit, .hanger .hook { pointer-events: auto; }
+.hanger .item { position: absolute; left: 0; top: 2px; width: 12vw; height: 34vh; margin-left: -6vw; transform-origin: 50% 0; will-change: transform; }
+.hanger .hook { position: absolute; left: 50%; top: 0; width: 18px; height: 22px; margin-left: -9px; border: 2.5px solid #1d1d1f; border-bottom: 0; border-radius: 10px 10px 0 0; }
+.hanger .hook::after { content: ''; position: absolute; left: 50%; top: 18px; width: 2.5px; height: 14px; margin-left: -1.25px; background: #1d1d1f; }
+.hanger .hit { position: absolute; left: 22%; right: 22%; top: 0; bottom: 0; }
+.hanger .item.on .hit { left: -10%; right: -10%; }
+.hanger .img { pointer-events: none; position: absolute; left: -20%; right: -20%; top: 30px; bottom: 0; filter: drop-shadow(0 22px 18px rgba(0, 0, 0, .3)); }
+/* frames keep the garment's height, so front and profile line up when they cross-fade */
+.hanger .turn { position: absolute; inset: 0; background: center top / auto 100% no-repeat; transform-origin: 50% 0; }
+.hanger .nil { position: absolute; inset: 10% 30% 50%; display: grid; place-items: center; font-size: 7vh; font-weight: 200; opacity: .7; }
+.hanger .sw { position: absolute; left: 35%; right: 35%; top: 6%; aspect-ratio: 1; border-radius: 999px; }
+.hanger .label { position: absolute; left: 50%; top: calc(100% + 1.6vh); transform: translateX(-50%); padding: 5px 9px; font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; background: #ffe600; color: #111; opacity: 0; transition: opacity .3s; }
 .hanger .item.on .label { opacity: 1; }
+.st-wall { position: absolute; left: 0; right: 30vw; top: 9vh; z-index: 2; text-align: center; pointer-events: none; font-weight: 500; font-size: min(12vh, 9vw); line-height: .86; letter-spacing: -.045em; text-transform: lowercase; color: rgba(0, 0, 0, .08); text-shadow: 0 2px 1px rgba(255, 255, 255, .2), 0 -1px 1px rgba(0, 0, 0, .22); }
+.st[data-tone='light'] .st-wall { color: rgba(0, 0, 0, .05); text-shadow: 0 2px 1px rgba(255, 255, 255, .7), 0 -1px 1px rgba(0, 0, 0, .14); }
 
 /* ---------------------------------------------------------------- look card + prompt */
 .look { color: var(--label); }
@@ -265,7 +277,9 @@
   .look .thumb { width: 48px; height: 48px; }
   .panel { left: 12px; right: 12px; width: auto; top: auto; height: 34vh; bottom: calc(2.4vh + 124px); }
   .st[data-mode='character'] .look { display: none; }
-  .hanger { right: 0; top: calc(3.2vh + 140px); }
+  .hanger { top: 30vh; height: 40vh; }
+  .hanger .item { width: 28vw; height: 26vh; margin-left: -14vw; }
+  .st-wall { right: 0; top: 17vh; font-size: 9vh; }
   .st-corner.r .chip span { display: none; }
   .st-corner.r .chip { width: 40px; padding: 0; justify-content: center; }
 }

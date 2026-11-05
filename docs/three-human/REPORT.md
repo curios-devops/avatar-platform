@@ -20,7 +20,8 @@ Fecha: 2026-11-04 · Rama: `exp/three-human` · Decide: Marcelo
 
 **Cómo se elige.**
 - **Arco de tarjetas de cristal.** Al asentarse, la prenda se prueba con la línea de escaneo.
-- **Percha.** Vista alternativa inspirada en un colgador real; se cambia con el botón "Percha / Arco".
+- **Percha.** Vista alternativa inspirada en una tienda real; se cambia con el botón "Percha / Arco". Las prendas cuelgan de perfil en una barra cromada y la del centro gira hasta quedar de frente (fotogramas a 0°, 30°, 60° y 90°, con fundido cruzado). Lleva etiqueta amarilla, pared gris y título en bajorrelieve ("mujer / conjuntos").
+- **Atuendo de partida:** camiseta blanca y vaqueros.
 - **Clic directo sobre el cuerpo.** La ropa abre Conjuntos, el pelo abre Pelo y la cara abre los sliders de Cara.
 - **Texto o voz.** Por ejemplo: "ponle aros dorados y cambia la ropa a blanco".
 
