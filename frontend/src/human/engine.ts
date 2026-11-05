@@ -5,21 +5,44 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { EXPRESSIONS, type Weights } from './visemes';
+import { SKIN, applySkin, skinShader, type SkinParams } from './skin';
 
 export type Look = {
   skin?: string; // asset path of the skin diffuse texture
   eyes?: string; // asset path of the iris texture
   hairColor?: string; // multiply tint, '#ffffff' keeps the texture
   clothesColor?: string;
+  tints?: Record<string, string>; // per proxy (mesh name), wins over clothesColor
+  accessories?: Accessory[];
   faceTexture?: string; // full URL of a projected face texture (Twin mode), replaces `skin`
 };
+export type Accessory = { id: 'hoops' | 'studs' | 'glasses' | 'sunglasses'; color?: string };
 export type Framing = 'face' | 'bust' | 'full';
+/** What sits under the pointer: the mesh kind from the baker (body, hair, clothes, shoes…) and the proxy name. */
+export type Pick = { kind: string; name: string };
 
 const X = new THREE.Vector3(1, 0, 0);
 const Y = new THREE.Vector3(0, 1, 0);
 const Z = new THREE.Vector3(0, 0, 1);
 // GLTFLoader sanitizes node names (PropertyBinding.sanitizeNodeName drops "." and friends): "eye.L" arrives as "eyeL".
 const key = (name: string) => name.replace(/[[\].:/]/g, '').replace(/\s/g, '_');
+
+/**
+ * Dye a garment: a multiply tint cannot turn a blue tee white, so the texture is taken to luminance and
+ * the new colour painted over it, keeping a third of the original shading for seams, folds and prints.
+ */
+function dye(m: THREE.MeshPhysicalMaterial, hex: string) {
+  const c = new THREE.Color(hex);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uDye = { value: c };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('void main() {', 'uniform vec3 uDye;\nvoid main() {')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        float dyeL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+        diffuseColor.rgb = uDye * mix(1.0, clamp(dyeL / 0.42, 0.25, 1.6), 0.35);`);
+  };
+  m.customProgramCacheKey = () => 'dye';
+}
 
 export class HumanEngine {
   readonly renderer: THREE.WebGLRenderer;
@@ -48,12 +71,22 @@ export class HumanEngine {
   private armDrop = { L: 0.8, R: 0.8 };
   private frames = 0;
   private fpsAt = 0;
+  private lights!: { key: THREE.DirectionalLight; fill: THREE.DirectionalLight; rim: THREE.DirectionalLight };
   fps = 0;
   walking = false;
   mouth: () => Weights = () => ({});
 
-  constructor(private host: HTMLElement, private assetBase: string) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  private accessories = new THREE.Group();
+  private ray = new THREE.Raycaster();
+  private shift = 0;
+  private lift = 0;
+  /** Camera distance for the full-body framing; the studio pulls back so the UI never covers the feet. */
+  fullDistance = 4.4;
+  private ground!: THREE.Mesh;
+
+  /** `transparent`: no background or fog, the floor only catches shadows, so the page behind shows through. */
+  constructor(private host: HTMLElement, private assetBase: string, transparent = false) {
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: transparent });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -67,8 +100,10 @@ export class HumanEngine {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.55;
-    this.scene.background = new THREE.Color('#2b2e34');
-    this.scene.fog = new THREE.Fog('#2b2e34', 8, 22);
+    if (!transparent) {
+      this.scene.background = new THREE.Color('#2b2e34');
+      this.scene.fog = new THREE.Fog('#2b2e34', 8, 22);
+    }
 
     const key = new THREE.DirectionalLight('#fff4e8', 2.4);
     key.position.set(1.6, 3.2, 2.4);
@@ -83,8 +118,11 @@ export class HumanEngine {
     const rim = new THREE.DirectionalLight('#ffffff', 1.4);
     rim.position.set(-1.2, 2.4, -2.6);
     this.scene.add(key, fill, rim, new THREE.HemisphereLight('#dde6ff', '#3a3330', 0.35));
+    this.lights = { key, fill, rim };
 
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(12, 64), new THREE.MeshStandardMaterial({ color: '#3a3e45', roughness: 0.95 }));
+    const ground = this.ground = new THREE.Mesh(new THREE.CircleGeometry(12, 64), transparent
+      ? new THREE.ShadowMaterial({ opacity: 0.22 })
+      : new THREE.MeshStandardMaterial({ color: '#3a3e45', roughness: 0.95 }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground, this.root);
@@ -114,7 +152,16 @@ export class HumanEngine {
     const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
+    if (this.shift || this.lift) this.camera.setViewOffset(w, h, -this.shift * w, this.lift * h, w, h);
+    else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
+  }
+
+  /** Slide the subject sideways on screen (fraction of the width, + = right) without changing the perspective. */
+  setShift(f: number, lift = this.lift) {
+    this.shift = f;
+    this.lift = lift;
+    this.resize();
   }
 
   // ------------------------------------------------------------------------------------------- model
@@ -151,6 +198,7 @@ export class HumanEngine {
       const rest = Math.atan2(b.y - a.y, Math.abs(b.x - a.x));
       this.armDrop[side] = THREE.MathUtils.clamp(rest + 1.36, 0, 1.6);
     }
+    this.anchorAccessories();
     await this.setLook(look);
     if (first) this.frame('bust');
   }
@@ -161,16 +209,162 @@ export class HumanEngine {
     const jobs: Promise<void>[] = [];
     this.model.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
+      if (!mesh.isMesh || !mesh.material || (mesh.material as THREE.Material).userData?.accessory) return;
       const old = mesh.material as THREE.Material;
       const extras = (old.userData ?? {}) as Record<string, any>;
-      jobs.push(this.material(extras).then((m) => {
+      jobs.push(this.material(extras, mesh.name).then((m) => {
         mesh.material = m;
         mesh.renderOrder = extras.zDepth ?? 0;
         mesh.castShadow = !['eyelashes', 'eyebrows'].includes(extras.kind);
       }));
     });
     await Promise.all(jobs);
+    this.buildAccessories();
+  }
+
+  /** The body part or garment under a page point, or null over empty space. */
+  pick(clientX: number, clientY: number): Pick | null {
+    if (!this.model) return null;
+    const r = this.renderer.domElement.getBoundingClientRect();
+    this.ray.setFromCamera(new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1), this.camera);
+    // skinned meshes raycast against their posed vertices (three applies the bones in SkinnedMesh.raycast)
+    for (const hit of this.ray.intersectObject(this.root, true)) {
+      const m = (hit.object as THREE.Mesh).material as THREE.Material;
+      const kind = m?.userData?.accessory ? 'accessory' : m?.userData?.kind;
+      if (!kind || ['eyelashes', 'teeth', 'tongue'].includes(kind)) continue;
+      const name = hit.object.name;
+      // the baker files shoes and hats under "clothes": tell them apart by name
+      if (kind === 'clothes') return { kind: /^shoes/.test(name) ? 'shoes' : /fedora|hat/.test(name) ? 'hat' : 'clothes', name };
+      return { kind, name };
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------------------------------------- accessories
+
+  // Earrings and glasses are drawn here, not baked: MakeHuman has no CC0 jewellery. They ride the head bone.
+  // rest-pose world points; the accessory group undoes the head's rest transform, so children live in rest world space
+  private ears: { L: THREE.Vector3; R: THREE.Vector3 } | null = null;
+  private eyes: THREE.Vector3[] = [];
+
+  /** Find the ear lobes on the rest-pose body: the outermost skin points at lobe height beside the head. */
+  private anchorAccessories() {
+    this.ears = null;
+    const head = this.bones.get(key('head'));
+    let body: THREE.Mesh | undefined;
+    this.model!.traverse((o) => { if ((o as THREE.Mesh).isMesh && ((o as THREE.Mesh).material as THREE.Material).userData?.kind === 'body') body = o as THREE.Mesh; });
+    if (!head || !body) return;
+    const eyeL = this.bone('eye.L'), eyeR = this.bone('eye.R');
+    const eyeY = (eyeL.y + eyeR.y) / 2, eyeZ = (eyeL.z + eyeR.z) / 2, iod = eyeL.distanceTo(eyeR) || 0.064;
+    const pos = body.geometry.getAttribute('position');
+    const v = new THREE.Vector3();
+    const best = { L: new THREE.Vector3(), R: new THREE.Vector3() }, far = { L: 0, R: 0 };
+    body.updateMatrixWorld(true);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(body.matrixWorld);
+      // lobes sit about 0.6 IOD under the eyes and ~1.3 IOD behind them
+      if (Math.abs(v.y - (eyeY - 0.62 * iod)) > 0.18 * iod || Math.abs(v.z - (eyeZ - 1.35 * iod)) > 0.35 * iod) continue;
+      const side = v.x > 0 ? 'L' : 'R';
+      if (Math.abs(v.x) > far[side]) { far[side] = Math.abs(v.x); best[side].copy(v); }
+    }
+    if (!far.L || !far.R) return;
+    this.ears = best;
+    this.eyes = [eyeL, eyeR];
+    this.accessories.matrixAutoUpdate = false;
+    this.accessories.matrix.copy(head.matrixWorld).invert();
+    head.add(this.accessories);
+  }
+
+  private buildAccessories() {
+    for (const c of [...this.accessories.children]) {
+      this.accessories.remove(c);
+      (c as THREE.Mesh).geometry?.dispose();
+    }
+    if (!this.ears) return;
+    const local = (w: THREE.Vector3) => w.clone();
+    const metal = (hex = '#d9b56a') => {
+      const m = new THREE.MeshPhysicalMaterial({ color: hex, metalness: 1, roughness: 0.22 });
+      m.userData = { accessory: true };
+      return m;
+    };
+    const iod = this.eyes[0].distanceTo(this.eyes[1]) || 0.064;
+    for (const a of this.look.accessories ?? []) {
+      if (a.id === 'hoops' || a.id === 'studs') {
+        for (const side of ['L', 'R'] as const) {
+          const lobe = this.ears[side].clone().add(new THREE.Vector3(Math.sign(this.ears[side].x) * 0.001, 0, 0));
+          const mesh = a.id === 'hoops'
+            ? new THREE.Mesh(new THREE.TorusGeometry(0.3 * iod, 0.022 * iod, 12, 48), metal(a.color))
+            : new THREE.Mesh(new THREE.SphereGeometry(0.05 * iod, 16, 12), metal(a.color ?? '#f2f2f2'));
+          const p = local(lobe);
+          if (a.id === 'hoops') { p.y -= 0.28 * iod; mesh.rotation.y = Math.PI / 2; }
+          mesh.position.copy(p);
+          mesh.castShadow = true;
+          this.accessories.add(mesh);
+        }
+      } else {
+        // glasses: two rounded rims in front of the eyes, a bridge and temples back to the ears
+        const sun = a.id === 'sunglasses';
+        const frame = metal(a.color ?? (sun ? '#1a1a1a' : '#2a2320'));
+        frame.metalness = sun ? 0.2 : 0.6;
+        frame.roughness = 0.35;
+        const g = new THREE.Group();
+        const eyes = this.eyes.map((e) => e.clone().add(new THREE.Vector3(0, 0, 0.42 * iod)));
+        for (const e of eyes) {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.36 * iod, 0.035 * iod, 10, 40), frame);
+          rim.scale.set(1.12, 0.86, 1);
+          rim.position.copy(local(e));
+          g.add(rim);
+          const lens = new THREE.Mesh(new THREE.CircleGeometry(0.36 * iod, 40), new THREE.MeshPhysicalMaterial(sun
+            ? { color: '#141414', roughness: 0.05, metalness: 0.4, transparent: true, opacity: 0.88 }
+            : { color: '#ffffff', roughness: 0, transmission: 1, transparent: true, opacity: 0.12 }));
+          lens.material.userData = { accessory: true };
+          lens.scale.copy(rim.scale);
+          lens.position.copy(rim.position);
+          g.add(lens);
+        }
+        const mid = local(eyes[0].clone().lerp(eyes[1], 0.5));
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * iod, 0.03 * iod, 0.3 * iod, 8), frame);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.copy(mid).add(new THREE.Vector3(0, 0.08 * iod, 0));
+        g.add(bridge);
+        for (const i of [0, 1]) {
+          const side = eyes[i].x > 0 ? 'L' : 'R';
+          const from = local(eyes[i].clone().add(new THREE.Vector3(Math.sign(eyes[i].x) * 0.4 * iod, 0.05 * iod, 0)));
+          const to = local(this.ears[side].clone().add(new THREE.Vector3(0, 0.55 * iod, 0)));
+          const len = from.distanceTo(to);
+          const temple = new THREE.Mesh(new THREE.CylinderGeometry(0.025 * iod, 0.025 * iod, len, 6), frame);
+          temple.position.copy(from).lerp(to, 0.5);
+          temple.quaternion.setFromUnitVectors(Y, to.clone().sub(from).normalize());
+          g.add(temple);
+        }
+        g.traverse((o) => { o.castShadow = true; });
+        this.accessories.add(g);
+      }
+    }
+  }
+
+  /** Skin shading: 'base' = Lambert + GGX with the warm wrap hack; 'callisto' adds the Callisto BRDF terms. */
+  setSkin(p: Partial<SkinParams>) {
+    applySkin(p);
+    this.model?.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.MeshPhysicalMaterial | undefined;
+      if (m?.userData?.kind === 'body' && m.sheen !== (SKIN.sheen ? 0.35 : 0)) { m.sheen = SKIN.sheen ? 0.35 : 0; m.needsUpdate = true; }
+    });
+  }
+
+  /** Test lighting: the default studio rig, or a single key from the front, the side (90°) or behind (rim). */
+  setLighting(preset: 'studio' | 'front' | 'side' | 'back') {
+    const { key, fill, rim } = this.lights;
+    const studio = preset === 'studio';
+    fill.visible = rim.visible = studio;
+    this.scene.environmentIntensity = studio ? 0.55 : 0.12;
+    key.intensity = studio ? 2.4 : 3.2;
+    const head = this.bone('head');
+    const at = { studio: [1.6, 3.2, 2.4], front: [0, 0.15, 3], side: [3, 0.15, 0], back: [-0.9, 0.4, -3] }[preset];
+    if (studio) key.position.set(at[0], at[1], at[2]);
+    else key.position.set(head.x + at[0], head.y + at[1], head.z + at[2]);
+    key.target.position.copy(studio ? new THREE.Vector3() : head);
+    key.target.updateMatrixWorld();
   }
 
   private tex(path: string, color = true): Promise<THREE.Texture> {
@@ -188,17 +382,17 @@ export class HumanEngine {
     return p;
   }
 
-  private async material(extras: Record<string, any>): Promise<THREE.Material> {
+  private async material(extras: Record<string, any>, name = ''): Promise<THREE.Material> {
     const kind = extras.kind as string;
     const tint = (hex?: string) => new THREE.Color(hex ?? '#ffffff');
     if (kind === 'body') {
       const map = this.look.faceTexture ?? this.look.skin;
       const m = new THREE.MeshPhysicalMaterial({
         map: map ? await this.tex(map) : null, color: map ? '#ffffff' : '#c99b84',
-        roughness: 0.5, specularIntensity: 0.45, sheen: 0.35, sheenRoughness: 0.8, sheenColor: new THREE.Color('#ff9a85'),
+        roughness: 0.5, specularIntensity: 0.45, sheen: SKIN.sheen ? 0.35 : 0, sheenRoughness: 0.8, sheenColor: new THREE.Color('#ff9a85'),
       });
       m.userData = extras;
-      softSkin(m);
+      skinShader(m);
       return m;
     }
     const diffuse = kind === 'eyes' && this.look.eyes ? this.look.eyes : extras.diffuseTexture;
@@ -206,9 +400,11 @@ export class HumanEngine {
     const m = new THREE.MeshPhysicalMaterial({
       map: diffuse ? await this.tex(diffuse) : null,
       normalMap: extras.normalmapTexture ? await this.tex(extras.normalmapTexture, false) : null,
-      color: kind === 'hair' || kind === 'eyebrows' ? tint(this.look.hairColor) : kind === 'clothes' ? tint(this.look.clothesColor) : '#ffffff',
+      color: kind === 'hair' || kind === 'eyebrows' ? tint(this.look.hairColor) : kind === 'clothes' && !this.look.tints?.[name] ? tint(this.look.clothesColor) : '#ffffff',
       roughness: kind === 'eyes' ? 0.12 : kind === 'teeth' ? 0.3 : kind === 'hair' ? 0.55 : 0.82,
       clearcoat: kind === 'eyes' ? 1 : 0,
+      // eyes reflect only off the tear film (coat, 4 %); a second base lobe doubled it past the measured 2.5-5.5 % (Callisto)
+      specularIntensity: kind === 'eyes' ? 0 : 1,
       sheen: kind === 'clothes' ? 0.6 : kind === 'hair' ? 0.25 : 0,
       sheenRoughness: 0.7,
       side: cutout ? THREE.DoubleSide : THREE.FrontSide,
@@ -217,6 +413,8 @@ export class HumanEngine {
       transparent: false,
     });
     m.userData = extras;
+    const recolor = kind === 'clothes' ? this.look.tints?.[name] : undefined;
+    if (recolor && recolor.toLowerCase() !== '#ffffff') dye(m, recolor);
     return m;
   }
 
@@ -227,22 +425,68 @@ export class HumanEngine {
     return b ? b.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1, 0);
   }
 
-  frame(framing: Framing | (() => void)) {
+  frame(framing: Framing | (() => void), smooth = false) {
     if (typeof framing === 'function') return framing();
     const target = framing === 'face' ? this.bone('head').add(new THREE.Vector3(0, 0.07, 0.02))
       : framing === 'bust' ? this.bone('neck01').add(new THREE.Vector3(0, -0.05, 0))
       : this.bone('spine03').add(new THREE.Vector3(0, -0.05, 0));
-    const dist = framing === 'face' ? 0.75 : framing === 'bust' ? 1.6 : 4.4;
-    const facing = this.root.getWorldDirection(new THREE.Vector3());
+    // full body: people taller than 1.75 m pull the camera back so they still fit; shorter ones stay small
+    const tall = Math.max(1, (this.bone('head').y + 0.16) / 1.75);
+    const dist = framing === 'face' ? 0.75 : framing === 'bust' ? 1.6 : this.fullDistance * tall;
+    // the studio turns the person, not the camera: frame from the front of the stage unless walking
+    const facing = this.walking ? this.root.getWorldDirection(new THREE.Vector3()) : new THREE.Vector3(0, 0, 1);
+    const pos = target.clone().addScaledVector(facing, dist).add(new THREE.Vector3(0, framing === 'full' ? 0.25 : 0.03, 0));
+    if (smooth) { this.camGoal = { target, pos }; return; }
+    this.camGoal = null;
     this.controls.target.copy(target);
-    this.camera.position.copy(target).addScaledVector(facing, dist).add(new THREE.Vector3(0, framing === 'full' ? 0.25 : 0.03, 0));
+    this.camera.position.copy(pos);
     this.controls.update();
   }
+  private camGoal: { target: THREE.Vector3; pos: THREE.Vector3 } | null = null;
+
+  /** Turn the person on the spot (drag on the body in the studio). */
+  turn(rad: number) {
+    if (!this.walking) this.root.rotation.y += rad;
+  }
+
   private bust = () => {
     this.controls.target.set(0, 1.45, 0);
     this.camera.position.set(0, 1.5, 1.6);
     this.controls.update();
   };
+
+  /** Show only the meshes whose proxy name is listed (null = everything). Accessories follow `withAccessories`. */
+  isolate(names: string[] | null, withAccessories = names === null) {
+    this.model?.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const acc = !!(mesh.material as THREE.Material)?.userData?.accessory;
+      mesh.visible = acc ? withAccessories : names === null || names.includes(mesh.name);
+    });
+  }
+
+  /** A transparent PNG of the current frame for thumbnails: no floor, eyes open, after the textures settle. */
+  async cutout(): Promise<string> {
+    const wasVisible = this.ground.visible;
+    this.ground.visible = false;
+    this.blinkAt = this.clock.elapsedTime + 100;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const url = this.screenshot();
+    this.ground.visible = wasVisible;
+    return url;
+  }
+
+  /** Frame an arbitrary bone range: used for shoes (feet) and hats (head top). */
+  frameBones(from: string, to: string, pad = 1.6) {
+    const a = this.bone(from), b = this.bone(to);
+    const target = a.clone().lerp(b, 0.5);
+    const size = Math.max(a.distanceTo(b), 0.12) * pad;
+    const dist = size / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
+    const facing = this.root.getWorldDirection(new THREE.Vector3());
+    this.controls.target.copy(target);
+    this.camera.position.copy(target).addScaledVector(facing, dist).add(new THREE.Vector3(0, size * 0.25, 0));
+    this.controls.update();
+  }
 
   screenshot(): string {
     this.renderer.render(this.scene, this.camera);
@@ -267,6 +511,12 @@ export class HumanEngine {
   private tick() {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     const t = this.clock.elapsedTime;
+    if (this.camGoal) {
+      const k = Math.min(1, dt * 5);
+      this.controls.target.lerp(this.camGoal.target, k);
+      this.camera.position.lerp(this.camGoal.pos, k);
+      if (this.camera.position.distanceTo(this.camGoal.pos) < 0.002) this.camGoal = null;
+    }
     this.controls.update();
     if (this.model) this.animate(t, dt);
     this.renderer.render(this.scene, this.camera);
@@ -373,15 +623,4 @@ export class HumanEngine {
       }
     }
   }
-}
-
-/** Wrap lighting for skin: light bleeds past the terminator with a warm tint, a cheap stand-in for subsurface scattering. */
-function softSkin(m: THREE.MeshPhysicalMaterial) {
-  m.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <lights_fragment_end>',
-      `#include <lights_fragment_end>
-      reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.10, 0.035, 0.02);`,
-    );
-  };
 }

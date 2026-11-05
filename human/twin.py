@@ -148,7 +148,7 @@ def correspondence() -> dict:
 # --------------------------------------------------------------------------------------------- fit
 
 
-def fit(photo: Path, face_changes: list[str], steps: int = 220) -> dict:
+def fit(photo: Path, face_changes: list[str], steps: int = 120) -> dict:
     import roma
 
     t0 = time.time()
@@ -185,11 +185,14 @@ def fit(photo: Path, face_changes: list[str], steps: int = 220) -> dict:
         return ph, lc
 
     history = []
+    # stage 0 only moves the camera, so the neutral body is evaluated once; stage 1 converges by ~80-100 steps
+    # (2026-11-05: 1.121 % at step 80 vs 1.122 % at 220), and each step is a full Anny forward pass
+    neutral = _shape_verts(full, {}, {})
     for stage, (params, n, lr) in enumerate((([rot, log_s, trans], 80, 0.03), ([rot, log_s, trans, p_raw, l_raw], steps, 0.04))):
         opt = torch.optim.Adam(params, lr=lr)
         for it in range(n):
             ph, lc = shape()
-            v = _shape_verts(full, ph if stage else {}, lc if stage else {}, grad=True)
+            v = _shape_verts(full, ph, lc, grad=True) if stage else neutral
             proj, _ = project(v)
             err = ((proj - tgt) ** 2).sum(1) / iod**2
             loss = (err * weight).mean() + (2e-5 * (torch.tanh(l_raw) ** 2).sum() + 1e-5 * (p_raw**2).sum() if stage else 0)

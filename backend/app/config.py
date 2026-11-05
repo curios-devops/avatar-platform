@@ -107,7 +107,18 @@ class Settings(BaseSettings):
     ORCH_LLM_PRIMARY: str = "gemini"           # gemini | openai
     ORCH_LLM_FALLBACK: str = "openai"
     ORCH_FIRST_TOKEN_TIMEOUT_S: float = 4.0    # si el primario no arranca, conmutar
-    ORCH_OPENAI_MODEL: str = "gpt-4o-mini"
+    ORCH_OPENAI_MODEL: str = "gpt-4o-mini"  # retirado: el modelo sale del nivel (ORCH_LLM_TIER)
+    # Niveles de modelo, los mismos de animation-studio: OpenAI primero y Claude de respaldo.
+    # Luna → Haiku (rápido), Sol → Sonnet, Astra → Opus. Los ids viven en .env (MODEL_*).
+    MODEL_LUNA: str = "gpt-6-luna"
+    MODEL_SOL: str = "gpt-6.1-sol"
+    MODEL_ASTRA: str = "gpt-6-astra"
+    MODEL_HAIKU: str = "claude-haiku-5-5"
+    MODEL_SONNET: str = "claude-sonnet-5-5"
+    MODEL_OPUS: str = "claude-opus-5-5"
+    CLAUDE_API_KEY: Optional[str] = None
+    ORCH_LLM_TIER: str = "luna"   # chat hablado: lo que manda es el primer token
+    HUMAN_EDIT_TIER: str = "sol"  # editor del humano: frase → operaciones, necesita precisión
     ORCH_GEMINI_MODEL: str = "gemini-3.1-flash-lite"
     ORCH_WHISPER_MODEL: str = "base"           # faster-whisper: tiny|base|small…
     # Persona del avatar (clon digital) — None usa el prompt por defecto

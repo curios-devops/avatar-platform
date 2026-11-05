@@ -2,6 +2,53 @@
 
 Fecha: 2026-11-04 · Rama: `exp/three-human` · Decide: Marcelo
 
+> **Decisión (2026-11-05, Marcelo):**
+> - El vídeo (A) se mantiene para el Twin fotorrealista y los vídeos de redes.
+> - El humano three.js pasa a ser el modo 3D, en lugar de seguir gastando GPU en la Etapa B.
+>
+> **Hecho desde entonces:**
+> - Voz en streaming: primer audio de 3,6 s a 1,4-1,6 s.
+> - Revisión de Callisto Protocol: [CALLISTO.md](CALLISTO.md).
+
+## Estudio (2026-11-05): nueva UI de configuración
+
+`?human=1` abre el estudio. El panel técnico anterior sigue en `?human=lab`.
+
+**Dos mundos sobre el mismo escenario.**
+- **Personaje:** cuerpo, cara, piel, pelo y ojos, o un Twin desde tu foto.
+- **Ropa (Fitting):** conjuntos, zapatos, sombreros, accesorios y pelo.
+
+**Cómo se elige.**
+- **Arco de tarjetas de cristal.** Al asentarse, la prenda se prueba con la línea de escaneo.
+- **Percha.** Vista alternativa inspirada en un colgador real; se cambia con el botón "Percha / Arco".
+- **Clic directo sobre el cuerpo.** La ropa abre Conjuntos, el pelo abre Pelo y la cara abre los sliders de Cara.
+- **Texto o voz.** Por ejemplo: "ponle aros dorados y cambia la ropa a blanco".
+
+**Personajes.** 14 personas variadas: edades de 8 a 75, todas las complexiones y orígenes africano, asiático, latino, indio y europeo.
+- Están hechos con el mismo cuerpo Anny y los recortes salen del propio creador (`?human=gen` → `human/studio/*.webp`).
+- Coste de imagen: 0.
+
+**Material Liquid Glass.**
+- Sigue la receta de 6 capas de Kubai (Lumno): sombra, desenfoque con saturación y brillo, refracción de borde con dispersión, tinte, luz de borde y color de texto.
+- La refracción usa un mapa de desplazamiento SVG en `backdrop-filter` (`studio/liquid.ts`), solo en Chromium.
+- Safari y Firefox se quedan con el cristal esmerilado.
+
+**Edición por lenguaje.** `POST /api/v1/human/edit` devuelve operaciones validadas contra el catálogo.
+- **LLM:** nivel Sol (gpt-6.1-sol, con Claude Sonnet de respaldo), en ~2-2,8 s. Acertó 5 de 5 frases de prueba, donde gpt-4o-mini falló en 3.
+- **Voz:** Whisper local.
+
+**Niveles de modelo** (los mismos de animation-studio):
+- **Chat hablado:** Luna (gpt-6-luna, `reasoning_effort: low`), primer token en 0,6-0,9 s. Respaldo: Claude Haiku.
+- **Editor:** Sol. Respaldo: Claude Sonnet.
+- **Astra:** queda para tareas pesadas.
+
+**Nuevo en el motor:** aros, pendientes, gafas y gafas de sol en el hueso de la cabeza; teñido real de prendas (de luminancia a color, ya puede pasar a blanco); clic sobre el cuerpo por raycast; encuadre suave según la altura.
+
+**Pendiente:**
+- La ropa CC0 de MakeHuman es limitada: 12 conjuntos y casi todo vaqueros y camisetas.
+- El peso alto de Anny apenas se nota en los personajes "corpulentos".
+- Medir fps en móvil real.
+
 ## Resumen
 
 Inspirado en el post de robot 2.0 (@alightinastorm, "Vibe Human 2.0", 2 nov 2026): creador de humanos 3D en three.js, con ropa, pelo, animación procedural y voz. Su repositorio público (`vibe-stack/vibe-human`) no tiene licencia y el origen de sus modelos es desconocido, así que **no se usó su código**. El experimento se construyó con piezas de licencia limpia:
@@ -51,8 +98,8 @@ cd ../frontend && npm install && npx vite --port 3000
 | Deformación por esqueleto vs Anny | Exacta con 9 influencias; recortada a 4 (three.js): error medio 0,2 mm, máx. 19 mm |
 | Ajuste de ropa, pelo y ojos | Ojos y cejas a 1-2 mm de su sitio; ropa holgada a ~14 mm del cuerpo; vale para hombre, mujer, niño y talla grande |
 | Escena | ~40 mil triángulos, 9 draw calls, 0,24 ms de CPU por cuadro. 30 fps en la pestaña automatizada, que limita a 30. **Móvil sin medir.** |
-| Twin: ajuste + textura | 12,6-12,8 s CPU; error de puntos 1,1 % de la distancia entre ojos |
-| Voz: primer audio | 3,6 s desde enviar el texto. El servidor tardó 1,1 s del primer token al primer audio; el resto es que el cliente espera la frase entera (mejorable a ~2 s con streaming, como el Feed). |
+| Twin: ajuste + textura | **11-12 s** de punta a punta (ajuste 7,5 s): el cuerpo neutro se calcula una vez y la segunda fase hace 120 pasos (converge hacia el paso 80). Antes eran 16-17 s (ajuste 12,6-12,8 s). El error de puntos no cambia: 1,1 % de la distancia entre ojos. Con el equipo cargado (creador 3D a 120 fps en Chrome y 6,9 GB de swap) el ajuste anterior llegaba a 23-43 s. |
+| Voz: primer audio | **1,38 / 1,62 s en caliente (2,37 s en frío)** desde enviar el texto, con streaming MediaSource como el Feed: el audio suena 4-10 ms después de llegar el primer trozo, así que lo que queda es LLM + ElevenLabs. Antes, 3,6 s esperando la frase entera. Sin MediaSource para MP3 vuelve al modo por frase. |
 | Lip-sync | `jawOpen` entre 0,05 y 0,55 siguiendo los visemas, con silencios |
 
 ### Parecido (ArcFace, el mismo `qa/metrics.py` que la Etapa B, contra `.triage/test_portrait.jpg`)
@@ -79,7 +126,7 @@ Nota: el recorte de LAM es su render frontal de cerca del harness; el fotograma 
 | Cuerpo entero y cualquier ángulo | Solo los clips pregrabados | Cabeza OK; cuerpo LHM en POC | Libre: caminar, girar, cualquier cámara | **three.js** |
 | Ropa, pelo, cuerpo, edad y etnia editables | Hay que regenerar clips | Fijo tras la reconstrucción | 70 piezas CC0, cambio en 0,2 s | **three.js** |
 | Seres inventados (Sofía, MEYA) | Necesita imagen generada + clips | Necesita imagen | Sliders y presets, consistente entre posts | **three.js** (A si se exige foto real) |
-| Latencia de conversación | ~6 s por frase en caliente; 14-20 s en frío | Sin lip-sync propio medido | 3,6 s medido; ~2 s con streaming | **three.js** |
+| Latencia de conversación | ~6 s por frase en caliente; 14-20 s en frío | Sin lip-sync propio medido | 1,4-1,6 s medido con streaming | **three.js** |
 | Calidad del lip-sync | MuseTalk pinta píxeles reales | — | Morphs por visema, creíble pero de juego | **A** |
 | Coste de render por minuto | GPU 4090: ~1,5 s de GPU por s de voz ≈ 0,02-0,03 USD/min, más espera en caliente; garantizar latencia exige un worker fijo (~520-800 USD/mes) | 0 (navegador) | 0 (navegador) | **three.js** (empate con B) |
 | Coste de crear un avatar | Minutos de GPU para los clips (no medido aquí) | Segundos o minutos de GPU (LAM/LHM) | 0,2 s de CPU (creador); 13 s de CPU (Twin) | **three.js** |
@@ -99,7 +146,6 @@ Precios de RunPod serverless 4090 de fuentes de 2026: entre ~0,72 y 1,10 USD/h s
 - **La ropa no simula tela:** se ajusta y se deforma con el esqueleto, sin caída física. El post sí simula tela; en `vibe-human` es código propio sin licencia.
 - **Caminata procedural** sin IK de pies, así que los pies resbalan un poco.
 - **El jean `female_casualsuit01`** trae manchas blancas en el bajo: vienen de su propia textura.
-- **Voz:** el cliente espera cada frase completa, lo que suma ~1-1,5 s.
 - **Gasto de la sesión:**
   - **Imágenes:** 0 USD, no se usó ninguna API.
   - **Voz:** una respuesta corta de ElevenLabs más el LLM, del orden de céntimos.
@@ -116,12 +162,12 @@ Encaje futuro: renderizar a MP4 el humano three.js para los posts de un Ser Pro 
 
 ## Próximos pasos propuestos (si Marcelo aprueba el camino)
 
-1. **Voz en streaming**, como el Feed (MSE o WebAudio por chunk), para bajar de 3,6 s a ~2 s.
-2. **Piel:**
-   - shader de subsuperficie;
-   - mapas de normales y poros;
-   - texturas generadas por IA en el espacio UV de MakeHuman.
-   Las texturas por IA necesitarían presupuesto de imagen; esta sesión tenía 1 USD y no se usó.
+1. ~~Voz en streaming~~: hecho, 1,4-1,6 s.
+2. **Piel**, en orden de impacto según la prueba de [CALLISTO.md](CALLISTO.md):
+   - subsuperficie real (SSS separable de Jimenez);
+   - mapa de detalle de poros;
+   - albedo por IA en el espacio UV de MakeHuman (necesita presupuesto de imagen).
+   Los términos BRDF de Callisto quedan apagados hasta tener fotos de referencia contra las que ajustarlos.
 3. **Twin:**
    - color de ojos y de pelo desde la foto;
    - relleno de los lados con las vistas sintéticas que ya existen (`worker/b15/make_views.py`).

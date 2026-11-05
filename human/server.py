@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from pydantic import BaseModel, Field
@@ -138,11 +139,16 @@ TWIN = Path(__file__).parent / "out" / "twin"
 @app.post("/twin/fit")
 async def twin_fit(request: Request):
     """Body: the photo bytes (jpeg/png). Returns the fitted shape and the URL of the projected skin texture."""
-    import twin
-
     data = await request.body()
     if not data or len(data) > 12_000_000:
         raise HTTPException(400, "photo required (max 12 MB)")
+    # ~13 s of CPU: off the event loop, so bakes and textures keep being served meanwhile
+    return await run_in_threadpool(_twin_fit, data)
+
+
+def _twin_fit(data: bytes) -> dict:
+    import twin
+
     try:
         img = Image.open(io.BytesIO(data)).convert("RGB")
     except Exception:
@@ -167,3 +173,37 @@ def twin_tex(name: str):
     if not path.is_relative_to(TWIN.resolve()) or not path.is_file():
         raise HTTPException(404)
     return Response(path.read_bytes(), media_type="image/png")
+
+
+# Studio cut-outs: characters, garments and hairstyles rendered by the creator itself on a transparent
+# background (frontend ?human=gen), trimmed and stored as WebP. Generated once, then served as files.
+STUDIO = Path(__file__).parent / "studio"
+STUDIO.mkdir(exist_ok=True)
+NAME = __import__("re").compile(r"^[a-z0-9_\-]{1,64}$")
+
+
+@app.get("/studio/{name}.webp")
+def studio_get(name: str):
+    path = STUDIO / f"{name}.webp"
+    if not NAME.match(name) or not path.is_file():
+        raise HTTPException(404)
+    return Response(path.read_bytes(), media_type="image/webp", headers={"cache-control": "public, max-age=3600"})
+
+
+@app.post("/studio/{name}")
+async def studio_put(name: str, request: Request):
+    """Store a cut-out: trim the transparent border, keep a small margin, cap the height at 1100 px."""
+    if not NAME.match(name):
+        raise HTTPException(400, "bad name")
+    img = Image.open(io.BytesIO(await request.body())).convert("RGBA")
+    box = img.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox()
+    if not box:
+        raise HTTPException(422, "empty image")
+    img = img.crop(box)
+    pad = max(4, img.height // 40)
+    canvas = Image.new("RGBA", (img.width + 2 * pad, img.height + 2 * pad))
+    canvas.paste(img, (pad, pad))
+    if canvas.height > 1100:
+        canvas = canvas.resize((round(canvas.width * 1100 / canvas.height), 1100), Image.LANCZOS)
+    canvas.save(STUDIO / f"{name}.webp", "WEBP", quality=88, method=5)
+    return {"name": name, "size": canvas.size}

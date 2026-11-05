@@ -3,13 +3,17 @@ import { Upload } from './pages/Upload';
 import { AvatarViewer } from './pages/AvatarViewer';
 import { FeedMode } from './pages/FeedMode';
 import { HumanLab } from './pages/HumanLab';
+import { Studio } from './human/studio/Studio';
+import { Generate } from './human/studio/Generate';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8000';
 
 // ETAPA A: ?feed=1 entra directo al modo Feed (avatar demo) durante el dev
 const START_FEED = new URLSearchParams(window.location.search).has('feed');
-// exp/three-human: ?human=1 abre el creador three.js (Anny + MakeHuman)
-const START_HUMAN = new URLSearchParams(window.location.search).has('human');
+// exp/three-human: ?human=1 abre el estudio three.js (Anny + MakeHuman); ?human=lab el panel técnico,
+// ?human=gen genera los recortes del carrusel
+const HUMAN_MODE = new URLSearchParams(window.location.search).get('human');
+const START_HUMAN = HUMAN_MODE !== null;
 
 // Entrada desde MEYA (/create → ?from=meya&lang=es): enlace de vuelta a su flujo de creación.
 // El destino sale de VITE_MEYA_URL, nunca de la query (sin open redirect).
@@ -41,7 +45,9 @@ function App() {
         }}>← MEYA</a>
       )}
       {currentView === 'human' ? (
-        <HumanLab serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />
+        HUMAN_MODE === 'lab' ? <HumanLab serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />
+          : HUMAN_MODE === 'gen' ? <Generate />
+          : <Studio serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />
       ) : currentView === 'feed' ? (
         <FeedMode serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />
       ) : currentView === 'upload' ? (

@@ -14,3 +14,4 @@ openai==1.35.0
 google-generativeai==0.7.0
 mediapipe>=0.10.0
 scipy>=1.11.0
+anthropic>=0.125,<1  # editor del humano three.js (Python 3.9: el SDK 1.x pide 3.10)

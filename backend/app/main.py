@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .api import avatar, animate, stream, speak, converse
+from .api import avatar, animate, stream, speak, converse, human
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -22,6 +22,7 @@ app.include_router(avatar.router, prefix=settings.API_V1_PREFIX)
 app.include_router(animate.router, prefix=settings.API_V1_PREFIX)
 app.include_router(stream.router, prefix=settings.API_V1_PREFIX)
 app.include_router(converse.router, prefix=settings.API_V1_PREFIX)
+app.include_router(human.router, prefix=settings.API_V1_PREFIX)
 
 @app.on_event("startup")
 async def _sync_lam_idle_timeout() -> None:

@@ -269,8 +269,8 @@ export function HumanLab({ serverUrl, onBack }: { serverUrl: string; onBack: () 
         {tab === 'twin' && (
           <>
             <p style={{ fontSize: 13, opacity: 0.75, marginTop: 0 }}>
-              {L('Only of yourself. Fits the face shape to your photo and projects it onto the skin, on CPU in about 15 s.',
-                'Solo de ti mismo. Ajusta la forma de la cara a tu foto y la proyecta sobre la piel, en CPU en unos 15 s.')}
+              {L('Only of yourself. Fits the face shape to your photo and projects it onto the skin, on CPU in about 12 s.',
+                'Solo de ti mismo. Ajusta la forma de la cara a tu foto y la proyecta sobre la piel, en CPU en unos 12 s.')}
             </p>
             <input type="file" accept="image/*" disabled={twin.busy} onChange={(e) => e.target.files?.[0] && fitTwin(e.target.files[0])} />
             <Row><button disabled={twin.busy} onClick={async () => fitTwin(await (await fetch(`${HUMAN_URL}/twin/tex/test_portrait.jpg`)).blob())} style={chip(false)}>
@@ -294,6 +294,7 @@ export function HumanLab({ serverUrl, onBack }: { serverUrl: string; onBack: () 
             <div style={{ fontSize: 12, marginBottom: 8 }}>
               {L('State', 'Estado')}: <b>{voice.state}</b>
               {voice.stats?.firstAudioMs != null && <> · {L('first audio', 'primer audio')} <b>{voice.stats.firstAudioMs} ms</b></>}
+              {voice.stats?.firstChunkMs != null && <> · {L('first chunk', 'primer trozo')} {voice.stats.firstChunkMs} ms</>}
               {voice.stats?.firstChunkServerMs != null && <> · {L('server', 'servidor')} {voice.stats.firstChunkServerMs} ms</>}
             </div>
             {SAY.map((s) => <button key={s} onClick={() => speak(s)} style={{ ...chip(false), display: 'block', width: '100%', textAlign: 'left', marginBottom: 6 }}>{s}</button>)}
