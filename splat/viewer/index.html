@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>splat A/B</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #20232a; overflow: hidden; font: 12px system-ui; color: #ccc; }
+  #hud { position: fixed; left: 8px; top: 6px; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/addons/", "@sparkjsdev/spark": "./lib/spark.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud">loading…</div>
+<script type="module">
+// ?ply=<file>&yaw=<deg>&dist=<m>&h=<look-at height>: one fixed camera, so every splat gets the same shots.
+// window.shot(yaw, dist, h) moves the camera from DevTools; window.ready says the splat has loaded.
+import * as THREE from 'three';
+import { SplatMesh, SparkRenderer } from '@sparkjsdev/spark';
+
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x20232a);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new SparkRenderer({ renderer, enableLod: q.get('lod') === '1' }));  // LOD blends splats above 2^18: off unless ?lod=1
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 50);
+
+window.shot = (yaw = 0, dist = 4.2, h = 0.9) => {
+  const t = THREE.MathUtils.degToRad(yaw);
+  camera.position.set(Math.sin(t) * dist, h, Math.cos(t) * dist);
+  camera.lookAt(0, h, 0);
+};
+window.shot(+(q.get('yaw') ?? 0), +(q.get('dist') ?? 4.2), +(q.get('h') ?? 0.9));
+
+const t0 = performance.now();
+const splat = new SplatMesh({ url: q.get('ply'), lod: q.get('lod') === '1' ? undefined : false });
+// ?rx=180 turns a y-down (OpenCV) splat upright; ?ry spins it to face +Z; ?y lifts it
+splat.rotation.set(THREE.MathUtils.degToRad(+(q.get('rx') ?? 0)), THREE.MathUtils.degToRad(+(q.get('ry') ?? 0)), 0, 'YXZ');
+splat.position.y = +(q.get('y') ?? 0);
+splat.scale.setScalar(+(q.get('s') ?? 1));
+scene.add(splat);
+splat.initialized.then(() => {
+  window.ready = { ms: Math.round(performance.now() - t0), splats: splat.numSplats };
+  document.getElementById('hud').textContent = `${q.get('ply')} · ${splat.numSplats} splats · ${window.ready.ms} ms`;
+});
+renderer.setAnimationLoop(() => renderer.render(scene, camera));
+</script>
+</body>
+</html>
