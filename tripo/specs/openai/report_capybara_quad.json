@@ -1,0 +1,60 @@
+{
+ "spent_usd": 0.0349,
+ "claude_opus_v0": {
+  "shapes": 19,
+  "union": 12,
+  "paint": 6,
+  "carve": 1,
+  "parts": 6,
+  "bones": 11,
+  "clips": {
+   "walk": 13
+  },
+  "detail": 12000,
+  "min_y": -0.002,
+  "bytes": 6012,
+  "issues": []
+ },
+ "luna": {
+  "finish": "stop",
+  "secs": 16.0,
+  "in": 1662,
+  "out": 2055,
+  "reasoning": 303,
+  "usd": 0.0012,
+  "shapes": 11,
+  "union": 9,
+  "paint": 2,
+  "carve": 0,
+  "parts": 2,
+  "bones": 6,
+  "clips": {
+   "walk": 4
+  },
+  "detail": 12000,
+  "min_y": 0.0,
+  "bytes": 3060,
+  "issues": []
+ },
+ "sol": {
+  "finish": "stop",
+  "secs": 25.2,
+  "in": 1662,
+  "out": 3043,
+  "reasoning": 0,
+  "usd": 0.0338,
+  "shapes": 16,
+  "union": 12,
+  "paint": 3,
+  "carve": 1,
+  "parts": 8,
+  "bones": 10,
+  "clips": {
+   "walk": 10
+  },
+  "detail": 12000,
+  "min_y": 0.0,
+  "bytes": 5686,
+  "issues": []
+ }
+}

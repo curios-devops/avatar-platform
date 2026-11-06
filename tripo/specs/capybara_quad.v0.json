@@ -1,0 +1,661 @@
+{
+ "name": "capibara_quad",
+ "detail": 12000,
+ "palette": {
+  "fur": "#8a5536",
+  "belly": "#b88a62",
+  "muzzle": "#4f3324",
+  "dark": "#3a261c",
+  "ear": "#5a3a2a"
+ },
+ "fur": {
+  "scale": 3.5,
+  "contrast": 0.32,
+  "bump": 0.03
+ },
+ "bones": [
+  {
+   "name": "hips",
+   "parent": null,
+   "pos": [
+    0,
+    0.38,
+    -0.2
+   ]
+  },
+  {
+   "name": "chest",
+   "parent": "hips",
+   "pos": [
+    0,
+    0.38,
+    0.12
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "chest",
+   "pos": [
+    0,
+    0.42,
+    0.28
+   ]
+  },
+  {
+   "name": "thigh_L",
+   "parent": "hips",
+   "pos": [
+    0.13,
+    0.3,
+    -0.27
+   ],
+   "mirror": true
+  },
+  {
+   "name": "hshin_L",
+   "parent": "thigh_L",
+   "pos": [
+    0.13,
+    0.15,
+    -0.26
+   ],
+   "mirror": true
+  },
+  {
+   "name": "shoulder_L",
+   "parent": "chest",
+   "pos": [
+    0.12,
+    0.29,
+    0.18
+   ],
+   "mirror": true
+  },
+  {
+   "name": "fshin_L",
+   "parent": "shoulder_L",
+   "pos": [
+    0.12,
+    0.14,
+    0.19
+   ],
+   "mirror": true
+  }
+ ],
+ "shapes": [
+  {
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.37,
+    -0.12
+   ],
+   "radii": [
+    0.2,
+    0.2,
+    0.3
+   ],
+   "bone": "hips",
+   "color": "fur",
+   "blend": 0.08
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.36,
+    0.13
+   ],
+   "radii": [
+    0.18,
+    0.18,
+    0.22
+   ],
+   "bone": "chest",
+   "color": "fur",
+   "blend": 0.08
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.4,
+    0.28
+   ],
+   "radii": [
+    0.13,
+    0.14,
+    0.12
+   ],
+   "bone": "head",
+   "color": "fur",
+   "blend": 0.07
+  },
+  {
+   "type": "box",
+   "center": [
+    0,
+    0.42,
+    0.42
+   ],
+   "size": [
+    0.19,
+    0.19,
+    0.28
+   ],
+   "round": 0.07,
+   "rot": [
+    8,
+    0,
+    0
+   ],
+   "bone": "head",
+   "color": "fur",
+   "blend": 0.05
+  },
+  {
+   "type": "box",
+   "center": [
+    0,
+    0.38,
+    0.555
+   ],
+   "size": [
+    0.18,
+    0.15,
+    0.09
+   ],
+   "round": 0.05,
+   "bone": "head",
+   "color": "muzzle",
+   "blend": 0.04
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.075,
+    0.53,
+    0.33
+   ],
+   "radii": [
+    0.032,
+    0.03,
+    0.02
+   ],
+   "bone": "head",
+   "color": "fur",
+   "blend": 0.015,
+   "mirror": true
+  },
+  {
+   "op": "carve",
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.325,
+    0.6
+   ],
+   "radii": [
+    0.06,
+    0.008,
+    0.03
+   ],
+   "bone": "head",
+   "blend": 0.01
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.13,
+    0.27,
+    -0.27
+   ],
+   "radii": [
+    0.08,
+    0.11,
+    0.1
+   ],
+   "bone": "thigh_L",
+   "color": "fur",
+   "blend": 0.06,
+   "mirror": true
+  },
+  {
+   "type": "capsule",
+   "a": [
+    0.13,
+    0.17,
+    -0.26
+   ],
+   "b": [
+    0.13,
+    0.045,
+    -0.25
+   ],
+   "r": 0.055,
+   "r2": 0.045,
+   "bone": "hshin_L",
+   "color": "fur",
+   "blend": 0.03,
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.13,
+    0.026,
+    -0.21
+   ],
+   "radii": [
+    0.05,
+    0.028,
+    0.08
+   ],
+   "bone": "hshin_L",
+   "color": "dark",
+   "blend": 0.025,
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.12,
+    0.25,
+    0.18
+   ],
+   "radii": [
+    0.07,
+    0.1,
+    0.08
+   ],
+   "bone": "shoulder_L",
+   "color": "fur",
+   "blend": 0.06,
+   "mirror": true
+  },
+  {
+   "type": "capsule",
+   "a": [
+    0.12,
+    0.16,
+    0.19
+   ],
+   "b": [
+    0.12,
+    0.045,
+    0.2
+   ],
+   "r": 0.05,
+   "r2": 0.042,
+   "bone": "fshin_L",
+   "color": "fur",
+   "blend": 0.03,
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.12,
+    0.024,
+    0.24
+   ],
+   "radii": [
+    0.045,
+    0.026,
+    0.065
+   ],
+   "bone": "fshin_L",
+   "color": "dark",
+   "blend": 0.025,
+   "mirror": true
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.19,
+    -0.02
+   ],
+   "radii": [
+    0.16,
+    0.08,
+    0.36
+   ],
+   "bone": "hips",
+   "color": "belly",
+   "soft": 0.05,
+   "opacity": 0.85
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0.09,
+    0.37,
+    0.42
+   ],
+   "radii": [
+    0.05,
+    0.07,
+    0.1
+   ],
+   "bone": "head",
+   "color": "belly",
+   "soft": 0.04,
+   "opacity": 0.7,
+   "mirror": true
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.38,
+    0.575
+   ],
+   "radii": [
+    0.12,
+    0.1,
+    0.07
+   ],
+   "bone": "head",
+   "color": "muzzle",
+   "soft": 0.03,
+   "opacity": 0.9
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0.075,
+    0.535,
+    0.345
+   ],
+   "radii": [
+    0.022,
+    0.022,
+    0.01
+   ],
+   "bone": "head",
+   "color": "ear",
+   "soft": 0.01,
+   "opacity": 0.9,
+   "mirror": true
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0.13,
+    0.03,
+    -0.22
+   ],
+   "radii": [
+    0.06,
+    0.04,
+    0.1
+   ],
+   "bone": "hshin_L",
+   "color": "dark",
+   "soft": 0.02,
+   "opacity": 1,
+   "mirror": true
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0.12,
+    0.03,
+    0.23
+   ],
+   "radii": [
+    0.055,
+    0.04,
+    0.08
+   ],
+   "bone": "fshin_L",
+   "color": "dark",
+   "soft": 0.02,
+   "opacity": 1,
+   "mirror": true
+  }
+ ],
+ "parts": [
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.09,
+    0.47,
+    0.4
+   ],
+   "radii": [
+    0.016,
+    0.018,
+    0.018
+   ],
+   "bone": "head",
+   "material": "eye",
+   "color": "#1a1210",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.04,
+    0.41,
+    0.598
+   ],
+   "radii": [
+    0.013,
+    0.008,
+    0.008
+   ],
+   "bone": "head",
+   "material": "matte",
+   "color": "#1e130e",
+   "mirror": true
+  },
+  {
+   "type": "cone",
+   "center": [
+    0.1,
+    0.014,
+    0.3
+   ],
+   "r": 0.01,
+   "length": 0.025,
+   "rot": [
+    90,
+    0,
+    0
+   ],
+   "bone": "fshin_L",
+   "material": "gloss",
+   "color": "#2a1c15",
+   "mirror": true
+  },
+  {
+   "type": "cone",
+   "center": [
+    0.14,
+    0.014,
+    0.3
+   ],
+   "r": 0.01,
+   "length": 0.025,
+   "rot": [
+    90,
+    0,
+    0
+   ],
+   "bone": "fshin_L",
+   "material": "gloss",
+   "color": "#2a1c15",
+   "mirror": true
+  },
+  {
+   "type": "cone",
+   "center": [
+    0.11,
+    0.015,
+    -0.135
+   ],
+   "r": 0.011,
+   "length": 0.028,
+   "rot": [
+    90,
+    0,
+    0
+   ],
+   "bone": "hshin_L",
+   "material": "gloss",
+   "color": "#2a1c15",
+   "mirror": true
+  },
+  {
+   "type": "cone",
+   "center": [
+    0.15,
+    0.015,
+    -0.135
+   ],
+   "r": 0.011,
+   "length": 0.028,
+   "rot": [
+    90,
+    0,
+    0
+   ],
+   "bone": "hshin_L",
+   "material": "gloss",
+   "color": "#2a1c15",
+   "mirror": true
+  }
+ ],
+ "clips": {
+  "walk": {
+   "period": 1.1,
+   "tracks": [
+    {
+     "bone": "thigh_L",
+     "ch": "rx",
+     "amp": 0.32,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "shoulder_R",
+     "ch": "rx",
+     "amp": 0.32,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "thigh_R",
+     "ch": "rx",
+     "amp": 0.32,
+     "phase": 180,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "shoulder_L",
+     "ch": "rx",
+     "amp": 0.32,
+     "phase": 180,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "hshin_L",
+     "ch": "rx",
+     "amp": 0.25,
+     "phase": 90,
+     "harmonic": 1,
+     "wave": "neg",
+     "bias": 0
+    },
+    {
+     "bone": "fshin_R",
+     "ch": "rx",
+     "amp": 0.3,
+     "phase": 90,
+     "harmonic": 1,
+     "wave": "pos",
+     "bias": 0
+    },
+    {
+     "bone": "hshin_R",
+     "ch": "rx",
+     "amp": 0.25,
+     "phase": 270,
+     "harmonic": 1,
+     "wave": "neg",
+     "bias": 0
+    },
+    {
+     "bone": "fshin_L",
+     "ch": "rx",
+     "amp": 0.3,
+     "phase": 270,
+     "harmonic": 1,
+     "wave": "pos",
+     "bias": 0
+    },
+    {
+     "bone": "hips",
+     "ch": "py",
+     "amp": 0.015,
+     "phase": 90,
+     "harmonic": 1,
+     "wave": "abs",
+     "bias": -0.008
+    },
+    {
+     "bone": "hips",
+     "ch": "rz",
+     "amp": 0.03,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "chest",
+     "ch": "rx",
+     "amp": 0.025,
+     "phase": 0,
+     "harmonic": 2,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "head",
+     "ch": "rx",
+     "amp": 0.06,
+     "phase": 60,
+     "harmonic": 2,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "head",
+     "ch": "ry",
+     "amp": 0.04,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    }
+   ]
+  }
+ }
+}

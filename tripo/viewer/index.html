@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tripo character</title>
+<style>html, body { margin: 0; height: 100%; background: #e9e6df; overflow: hidden; font: 12px system-ui; } #hud { position: fixed; left: 8px; top: 6px; }</style>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/addons/" } }</script>
+</head>
+<body>
+<div id="hud">loading…</div>
+<script type="module">
+// ?glb=<file>: loads a rigged Tripo GLB, plays its first clip and frames it; window.seek(t) poses it at t seconds.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe9e6df);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f70, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+sun.position.set(2, 4, 3);
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.01, 100);
+let mixer, action, clip;
+const t0 = performance.now();
+new GLTFLoader().load(q.get('glb'), (gltf) => {
+  const root = gltf.scene;
+  scene.add(root);
+  const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const d = Math.max(size.x, size.y, size.z) * +(q.get("zoom") ?? 2.4);
+  const yaw = THREE.MathUtils.degToRad(+(q.get("yaw") ?? 45));
+  camera.position.set(c.x + d * Math.sin(yaw), c.y + d * 0.3, c.z + d * Math.cos(yaw));
+  camera.lookAt(c);
+  if (gltf.animations.length) {
+    mixer = new THREE.AnimationMixer(root);
+    clip = gltf.animations[0];
+    action = mixer.clipAction(clip).play();
+  }
+  let bones = 0;
+  root.traverse((o) => { if (o.isBone) bones++; });
+  window.ready = { ms: Math.round(performance.now() - t0), clips: gltf.animations.map((a) => [a.name, +a.duration.toFixed(2)]), bones };
+  document.getElementById('hud').textContent = JSON.stringify(window.ready);
+});
+window.seek = (t) => { if (mixer) { action.time = t; mixer.update(0); } renderer.render(scene, camera); };
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => { if (mixer && !window.frozen) mixer.update(clock.getDelta()); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

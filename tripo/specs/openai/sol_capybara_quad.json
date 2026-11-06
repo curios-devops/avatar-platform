@@ -1,0 +1,645 @@
+{
+ "name": "capibara_paseo",
+ "detail": 12000,
+ "palette": {
+  "fur": "#925b3e",
+  "belly": "#bc906a",
+  "cheek": "#ac7955",
+  "dark": "#593c30",
+  "inner": "#795044"
+ },
+ "fur": {
+  "scale": 3.5,
+  "contrast": 0.32,
+  "bump": 0.025
+ },
+ "bones": [
+  {
+   "name": "hips",
+   "parent": null,
+   "pos": [
+    0,
+    0.39,
+    -0.1
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "hips",
+   "pos": [
+    0,
+    0.49,
+    0.23
+   ]
+  },
+  {
+   "name": "thigh_L",
+   "parent": "hips",
+   "pos": [
+    0.155,
+    0.32,
+    -0.27
+   ],
+   "mirror": true
+  },
+  {
+   "name": "knee_L",
+   "parent": "thigh_L",
+   "pos": [
+    0.165,
+    0.17,
+    -0.25
+   ],
+   "mirror": true
+  },
+  {
+   "name": "arm_L",
+   "parent": "hips",
+   "pos": [
+    0.15,
+    0.33,
+    0.19
+   ],
+   "mirror": true
+  },
+  {
+   "name": "wrist_L",
+   "parent": "arm_L",
+   "pos": [
+    0.16,
+    0.16,
+    0.21
+   ],
+   "mirror": true
+  }
+ ],
+ "shapes": [
+  {
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.39,
+    -0.075
+   ],
+   "radii": [
+    0.235,
+    0.25,
+    0.385
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "hips",
+   "color": "fur",
+   "blend": 0.075
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.41,
+    0.19
+   ],
+   "radii": [
+    0.205,
+    0.22,
+    0.23
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "hips",
+   "color": "fur",
+   "blend": 0.07
+  },
+  {
+   "type": "box",
+   "center": [
+    0,
+    0.51,
+    0.365
+   ],
+   "size": [
+    0.335,
+    0.285,
+    0.35
+   ],
+   "round": 0.085,
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "head",
+   "color": "fur",
+   "blend": 0.06
+  },
+  {
+   "type": "box",
+   "center": [
+    0,
+    0.455,
+    0.515
+   ],
+   "size": [
+    0.32,
+    0.205,
+    0.2
+   ],
+   "round": 0.055,
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "head",
+   "color": "dark",
+   "blend": 0.025
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.13,
+    0.443,
+    0.385
+   ],
+   "radii": [
+    0.058,
+    0.088,
+    0.105
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "head",
+   "color": "cheek",
+   "blend": 0.035,
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.124,
+    0.658,
+    0.285
+   ],
+   "radii": [
+    0.049,
+    0.057,
+    0.032
+   ],
+   "rot": [
+    -8,
+    0,
+    -16
+   ],
+   "bone": "head",
+   "color": "fur",
+   "blend": 0.02,
+   "mirror": true
+  },
+  {
+   "type": "capsule",
+   "a": [
+    0.15,
+    0.315,
+    -0.27
+   ],
+   "b": [
+    0.165,
+    0.16,
+    -0.25
+   ],
+   "r": 0.095,
+   "r2": 0.064,
+   "bone": "thigh_L",
+   "color": "fur",
+   "blend": 0.045,
+   "mirror": true
+  },
+  {
+   "type": "capsule",
+   "a": [
+    0.165,
+    0.18,
+    -0.25
+   ],
+   "b": [
+    0.165,
+    0.065,
+    -0.235
+   ],
+   "r": 0.062,
+   "r2": 0.052,
+   "bone": "knee_L",
+   "color": "fur",
+   "blend": 0.03,
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.165,
+    0.043,
+    -0.205
+   ],
+   "radii": [
+    0.067,
+    0.043,
+    0.095
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "knee_L",
+   "color": "dark",
+   "blend": 0.02,
+   "mirror": true
+  },
+  {
+   "type": "capsule",
+   "a": [
+    0.15,
+    0.32,
+    0.19
+   ],
+   "b": [
+    0.16,
+    0.155,
+    0.21
+   ],
+   "r": 0.075,
+   "r2": 0.056,
+   "bone": "arm_L",
+   "color": "fur",
+   "blend": 0.045,
+   "mirror": true
+  },
+  {
+   "type": "capsule",
+   "a": [
+    0.16,
+    0.17,
+    0.21
+   ],
+   "b": [
+    0.16,
+    0.06,
+    0.23
+   ],
+   "r": 0.055,
+   "r2": 0.047,
+   "bone": "wrist_L",
+   "color": "fur",
+   "blend": 0.025,
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.16,
+    0.04,
+    0.26
+   ],
+   "radii": [
+    0.062,
+    0.04,
+    0.09
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "bone": "wrist_L",
+   "color": "dark",
+   "blend": 0.02,
+   "mirror": true
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.18,
+    -0.055
+   ],
+   "radii": [
+    0.205,
+    0.095,
+    0.32
+   ],
+   "bone": "hips",
+   "color": "belly",
+   "soft": 0.055,
+   "opacity": 0.9
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0.153,
+    0.447,
+    0.382
+   ],
+   "radii": [
+    0.055,
+    0.067,
+    0.085
+   ],
+   "bone": "head",
+   "color": "belly",
+   "soft": 0.035,
+   "opacity": 0.55,
+   "mirror": true
+  },
+  {
+   "op": "paint",
+   "type": "ellipsoid",
+   "center": [
+    0.124,
+    0.668,
+    0.309
+   ],
+   "radii": [
+    0.031,
+    0.035,
+    0.016
+   ],
+   "bone": "head",
+   "color": "inner",
+   "soft": 0.012,
+   "opacity": 0.9,
+   "mirror": true
+  },
+  {
+   "op": "carve",
+   "type": "ellipsoid",
+   "center": [
+    0,
+    0.404,
+    0.61
+   ],
+   "radii": [
+    0.113,
+    0.009,
+    0.018
+   ],
+   "bone": "head",
+   "blend": 0.005
+  }
+ ],
+ "parts": [
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.164,
+    0.558,
+    0.441
+   ],
+   "radii": [
+    0.012,
+    0.016,
+    0.018
+   ],
+   "rot": [
+    0,
+    -20,
+    0
+   ],
+   "bone": "head",
+   "material": "eye",
+   "color": "#211812",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.092,
+    0.495,
+    0.609
+   ],
+   "radii": [
+    0.022,
+    0.012,
+    0.009
+   ],
+   "rot": [
+    0,
+    0,
+    -10
+   ],
+   "bone": "head",
+   "material": "matte",
+   "color": "#2f231d",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.122,
+    0.031,
+    0.338
+   ],
+   "radii": [
+    0.014,
+    0.012,
+    0.019
+   ],
+   "bone": "wrist_L",
+   "material": "matte",
+   "color": "#392a24",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.16,
+    0.031,
+    0.345
+   ],
+   "radii": [
+    0.014,
+    0.012,
+    0.019
+   ],
+   "bone": "wrist_L",
+   "material": "matte",
+   "color": "#392a24",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.198,
+    0.031,
+    0.338
+   ],
+   "radii": [
+    0.014,
+    0.012,
+    0.019
+   ],
+   "bone": "wrist_L",
+   "material": "matte",
+   "color": "#392a24",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.125,
+    0.031,
+    -0.122
+   ],
+   "radii": [
+    0.014,
+    0.012,
+    0.019
+   ],
+   "bone": "knee_L",
+   "material": "matte",
+   "color": "#392a24",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.165,
+    0.031,
+    -0.116
+   ],
+   "radii": [
+    0.014,
+    0.012,
+    0.019
+   ],
+   "bone": "knee_L",
+   "material": "matte",
+   "color": "#392a24",
+   "mirror": true
+  },
+  {
+   "type": "ellipsoid",
+   "center": [
+    0.205,
+    0.031,
+    -0.122
+   ],
+   "radii": [
+    0.014,
+    0.012,
+    0.019
+   ],
+   "bone": "knee_L",
+   "material": "matte",
+   "color": "#392a24",
+   "mirror": true
+  }
+ ],
+ "clips": {
+  "walk": {
+   "period": 1.3,
+   "tracks": [
+    {
+     "bone": "hips",
+     "ch": "py",
+     "amp": 0.015,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "abs",
+     "bias": 0
+    },
+    {
+     "bone": "head",
+     "ch": "rx",
+     "amp": 0.045,
+     "phase": 35,
+     "harmonic": 2,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "arm_L",
+     "ch": "rx",
+     "amp": 0.28,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "arm_R",
+     "ch": "rx",
+     "amp": 0.28,
+     "phase": 180,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "thigh_L",
+     "ch": "rx",
+     "amp": 0.28,
+     "phase": 180,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "thigh_R",
+     "ch": "rx",
+     "amp": 0.28,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "sin",
+     "bias": 0
+    },
+    {
+     "bone": "wrist_L",
+     "ch": "rx",
+     "amp": 0.22,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "pos",
+     "bias": 0
+    },
+    {
+     "bone": "wrist_R",
+     "ch": "rx",
+     "amp": 0.22,
+     "phase": 180,
+     "harmonic": 1,
+     "wave": "pos",
+     "bias": 0
+    },
+    {
+     "bone": "knee_L",
+     "ch": "rx",
+     "amp": 0.25,
+     "phase": 180,
+     "harmonic": 1,
+     "wave": "neg",
+     "bias": 0
+    },
+    {
+     "bone": "knee_R",
+     "ch": "rx",
+     "amp": 0.25,
+     "phase": 0,
+     "harmonic": 1,
+     "wave": "neg",
+     "bias": 0
+    }
+   ]
+  }
+ }
+}

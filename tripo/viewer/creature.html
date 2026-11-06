@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Creature · LLM spec → three.js</title>
+<style>html, body { margin: 0; height: 100%; background: #e9e6df; overflow: hidden; font: 12px system-ui; } #hud { position: fixed; left: 8px; top: 6px; white-space: pre; }</style>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/addons/" } }</script>
+</head>
+<body>
+<div id="hud">building…</div>
+<script type="module">
+// Shows a creature built by kit.js from an LLM-written spec.
+//   ?spec=specs/capybara_quad.json  ?clip=walk  ?yaw=40  ?tripo=1 (Tripo's capybara beside it)
+//   ?proc=1 (the hand-written procedural capybara beside it, from capybara.html's GLB export)
+// window.sheet(name) renders a QA sheet (4 views × rest + 2 clip poses) and saves it through serve.py;
+// window.exportGlb() exports body + parts + baked clips and returns the byte size.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { buildCreature } from './kit.js';
+
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe9e6df);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f70, 1.8));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(2, 4, 3);
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 48), new THREE.MeshStandardMaterial({ color: 0xdcd7cc, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.01, 100);
+
+const specUrl = q.get('spec') ?? 'specs/capybara_quad.json';
+const spec = await (await fetch(specUrl, { cache: 'no-store' })).json();
+const specBytes = JSON.stringify(spec).length;
+for (const k of ['scale', 'contrast', 'bump']) if (q.has(k)) spec.fur = { ...spec.fur, [k]: +q.get(k) }; // tuning
+const c = buildCreature(spec);
+scene.add(c.group);
+const clipName = q.get('clip') ?? c.stats.clips[0];
+
+// framing from the rest pose
+const box = new THREE.Box3().setFromObject(c.group), size = box.getSize(new THREE.Vector3()), centre = box.getCenter(new THREE.Vector3());
+const radius = size.length() / 2;
+const frame = (yawDeg, obj = centre, r = radius) => {
+  const yaw = THREE.MathUtils.degToRad(yawDeg), d = (r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.05;
+  camera.position.set(obj.x + d * Math.sin(yaw), obj.y + d * 0.28, obj.z + d * Math.cos(yaw));
+  camera.lookAt(obj);
+};
+
+// optional neighbours, scaled to the same height, along the screen's horizontal axis
+const others = [];
+const side = (yawDeg) => { const y = THREE.MathUtils.degToRad(yawDeg); return new THREE.Vector3(Math.cos(y), 0, -Math.sin(y)); };
+async function neighbour(url, name) {
+  const g = await new GLTFLoader().loadAsync(url), o = g.scene;
+  const b = new THREE.Box3().setFromObject(o), s = size.y / b.getSize(new THREE.Vector3()).y;
+  o.scale.setScalar(s); o.position.set(0, -b.min.y * s, 0); o.name = name; scene.add(o);
+  const mixer = g.animations.length ? new THREE.AnimationMixer(o) : null, action = mixer?.clipAction(g.animations[0]).play();
+  others.push({ o, mixer, action, w: b.getSize(new THREE.Vector3()).x * s });
+}
+if (q.get('tripo') === '1') await neighbour('data/capybara_walk.glb', 'tripo');
+if (q.get('proc') === '1') await neighbour('data/capybara_proc.glb', 'proc');
+const yaw0 = +(q.get('yaw') ?? 40);
+if (others.length) {
+  const all = [c.group, ...others.map((n) => n.o)], gap = size.x * 0.25 + 0.15, s = side(yaw0);
+  const widths = [Math.max(size.x, size.z), ...others.map((n) => Math.max(n.w, size.z))];
+  let x = -widths.reduce((a, w) => a + w + gap, -gap) / 2;
+  all.forEach((o, i) => { o.position.addScaledVector(s, x + widths[i] / 2); x += widths[i] + gap; });
+}
+
+const fit = () => {
+  if (!others.length) return frame(yaw0);
+  const b = new THREE.Box3(); [c.group, ...others.map((n) => n.o)].forEach((o) => b.expandByObject(o));
+  frame(yaw0, b.getCenter(new THREE.Vector3()), b.getSize(new THREE.Vector3()).length() / 2 * 0.8 / +(q.get('zoom') ?? 1));
+};
+fit();
+
+const poseAll = (t) => {
+  c.pose(clipName, t);
+  for (const n of others) if (n.mixer) { n.action.time = t % n.action.getClip().duration; n.mixer.update(0); }
+};
+window.seek = (t) => { window.frozen = true; poseAll(t); renderer.render(scene, camera); };
+
+// QA sheet: columns = front, left side, 3/4, back; rows = rest, and two moments of each clip
+window.sheet = async (name, cell = 360) => {
+  window.frozen = true;
+  const cols = [0, 90, 40, 180], rows = [['rest', null, 0]];
+  for (const [n, cl] of Object.entries(c.clips)) rows.push([`${n} 1/4`, n, cl.period * 0.25], [`${n} 3/4`, n, cl.period * 0.75]);
+  const cv = document.createElement('canvas'); cv.width = cell * cols.length; cv.height = cell * rows.length;
+  const g = cv.getContext('2d');
+  const old = renderer.getSize(new THREE.Vector2());
+  renderer.setSize(cell, cell); camera.aspect = 1; camera.updateProjectionMatrix();
+  rows.forEach(([label, clip, t], r) => {
+    c.pose(clip, t);
+    cols.forEach((yaw, k) => {
+      frame(yaw); renderer.render(scene, camera);
+      g.drawImage(renderer.domElement, k * cell, r * cell);
+      g.fillStyle = '#333'; g.font = '14px system-ui'; g.fillText(`${label} · yaw ${yaw}°`, k * cell + 6, r * cell + 18);
+    });
+  });
+  renderer.setSize(old.x, old.y); camera.aspect = old.x / old.y; camera.updateProjectionMatrix(); fit();
+  c.pose(null, 0);
+  const blob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.88));
+  if (name) await fetch(`/save?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
+  window.frozen = false;
+  return { bytes: blob.size, rows: rows.length };
+};
+
+window.exportGlb = async (name) => {
+  const t1 = performance.now();
+  c.pose(null, 0);
+  const animations = Object.keys(c.clips).map((n) => c.bake(n));
+  const buf = await new GLTFExporter().parseAsync(c.group, { binary: true, animations });
+  if (name) await fetch(`/save?name=${encodeURIComponent(name)}`, { method: 'POST', body: buf });
+  return { bytes: buf.byteLength, ms: +(performance.now() - t1).toFixed(1) };
+};
+// a still of the live scene (for side-by-side comparisons)
+window.still = async (name, t = 0) => {
+  window.seek(t);
+  const blob = await new Promise((res) => renderer.domElement.toBlob(res, 'image/jpeg', 0.9));
+  if (name) await fetch(`/save?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
+  return { bytes: blob.size };
+};
+
+window.ready = { ...c.stats, specBytes, clip: clipName };
+document.getElementById('hud').textContent = JSON.stringify(window.ready);
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  if (!window.frozen) {
+    const t = clock.elapsedTime;
+    c.pose(clipName, t);
+    for (const n of others) n.mixer?.update(dt);
+  }
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

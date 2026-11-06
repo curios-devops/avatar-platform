@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Capybara · three.js procedural vs Tripo</title>
+<style>html, body { margin: 0; height: 100%; background: #e9e6df; overflow: hidden; font: 12px system-ui; } #hud { position: fixed; left: 8px; top: 6px; white-space: pre; }</style>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/addons/" } }</script>
+</head>
+<body>
+<div id="hud">building…</div>
+<script type="module">
+// A low-poly capybara built in code, in the style of the one in the Summer Plays video: faceted
+// icospheres with per-face colour, rigid parts hung from a small bone tree, a procedural quadruped
+// walk. No model download and no GPU: it is built on the CPU in a few milliseconds. GLTFExporter
+// writes it out with a baked walk clip, so its size can be compared with Tripo's GLB.
+//
+// ?tripo=1 shows the Tripo capybara beside it; window.seek(t) poses both at t seconds;
+// window.exportGlb() returns the byte size of the exported GLB (and keeps it in window.glb).
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe9e6df);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f70, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(2, 4, 3);
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.01, 100);
+
+// ── geometry helpers ──
+const hash = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
+// a faceted blob: an icosphere scaled per axis, its vertices nudged by a fixed noise, flat shaded,
+// each face tinted slightly so the facets read like the hand-made low-poly look
+function blob(rx, ry, rz, detail, colour, jitter = 0.06, shape) {
+  const g = new THREE.IcosahedronGeometry(1, detail);
+  const p = g.attributes.position, v = new THREE.Vector3(), seen = new Map();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const k = `${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)}`; // shared corners move together
+    if (!seen.has(k)) {
+      const n = 1 + (hash(v.x, v.y, v.z) - 0.5) * jitter;
+      const w = v.clone().multiplyScalar(n);
+      if (shape) shape(w);
+      seen.set(k, w.multiply(new THREE.Vector3(rx, ry, rz)));
+    }
+    p.setXYZ(i, ...seen.get(k).toArray());
+  }
+  const c = new THREE.Color(colour), cols = [];
+  for (let f = 0; f < p.count / 3; f++) {
+    const t = 0.92 + 0.16 * hash(f, 1.7, 3.1);
+    for (let j = 0; j < 3; j++) cols.push(c.r * t, c.g * t, c.b * t);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  g.computeVertexNormals();
+  return g;
+}
+const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
+const mesh = (g, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); return m; };
+
+// ── the character: body → head, and four legs, each a bone (an Object3D) with rigid meshes ──
+const t0 = performance.now();
+const FUR = 0x9a6038, SNOUT = 0x6e4a3e, FOOT = 0x4a3028, EAR = 0x7a4a30;
+const capy = new THREE.Group(); capy.name = 'capybara';
+const hips = new THREE.Object3D(); hips.name = 'hips'; hips.position.set(0, 0.46, 0); capy.add(hips);
+// body: a bean, fuller at the back
+hips.add(mesh(blob(0.3, 0.28, 0.5, 2, FUR, 0.07, (w) => { w.y += 0.12 * Math.max(0, -w.z) * (w.y > 0 ? 1 : 0); w.x *= 1 + 0.08 * -w.z; })));
+const neck = new THREE.Object3D(); neck.name = 'neck'; neck.position.set(0, 0.1, 0.36); hips.add(neck);
+const head = new THREE.Object3D(); head.name = 'head'; head.position.set(0, 0.05, 0.12); neck.add(head);
+// head: a blocky box-like blob, flat at the front where the snout sits
+head.add(mesh(blob(0.19, 0.19, 0.26, 1, FUR, 0.08, (w) => { if (w.z > 0.4) w.z = 0.4 + (w.z - 0.4) * 0.35; w.y -= 0.12 * Math.max(0, w.z); }), 0, 0.02, 0.06));
+head.add(mesh(blob(0.15, 0.12, 0.08, 1, SNOUT, 0.05), 0, -0.02, 0.29)); // snout
+for (const s of [-1, 1]) {
+  head.add(mesh(blob(0.022, 0.016, 0.02, 0, 0x2a1a16, 0.02), s * 0.05, -0.0, 0.36)); // nostril
+  const eye = mesh(blob(0.032, 0.032, 0.032, 1, 0x161210, 0.02), s * 0.15, 0.08, 0.11); head.add(eye);
+  eye.add(mesh(blob(0.009, 0.009, 0.009, 0, 0xffffff, 0), s * 0.012, 0.012, 0.022)); // highlight
+  const ear = mesh(blob(0.05, 0.065, 0.03, 0, EAR, 0.1), s * 0.13, 0.19, -0.07); ear.rotation.z = -s * 0.3; head.add(ear);
+}
+const legs = [];
+for (const [name, x, z] of [['legFL', -0.17, 0.27], ['legFR', 0.17, 0.27], ['legBL', -0.19, -0.3], ['legBR', 0.19, -0.3]]) {
+  const hip = new THREE.Object3D(); hip.name = name; hip.position.set(x, -0.12, z); hips.add(hip);
+  hip.add(mesh(blob(0.085, 0.16, 0.095, 1, FUR, 0.06), 0, -0.06, 0));            // thigh, half inside the body
+  const knee = new THREE.Object3D(); knee.name = `${name}_knee`; knee.position.set(0, -0.2, 0); hip.add(knee);
+  knee.add(mesh(blob(0.055, 0.1, 0.06, 1, SNOUT, 0.05), 0, -0.04, 0));          // shin
+  knee.add(mesh(blob(0.07, 0.035, 0.1, 1, FOOT, 0.08), 0, -0.13, 0.03));        // foot with a flat sole
+  legs.push({ hip, knee, phase: name === 'legFL' || name === 'legBR' ? 0 : Math.PI });
+}
+scene.add(capy);
+const buildMs = +(performance.now() - t0).toFixed(1);
+let tris = 0;
+capy.traverse((o) => { if (o.isMesh) tris += o.geometry.attributes.position.count / 3; });
+
+// ── the walk: diagonal pairs, a bob at twice the step rate, a small head nod ──
+const PERIOD = 0.9;
+function walk(t) {
+  const w = (t / PERIOD) * Math.PI * 2;
+  for (const l of legs) {
+    const a = Math.sin(w + l.phase);
+    l.hip.rotation.x = a * 0.45;
+    l.knee.rotation.x = Math.max(0, -Math.cos(w + l.phase)) * 0.6; // bend while the foot swings forward
+  }
+  hips.position.y = 0.46 + Math.abs(Math.sin(w)) * 0.018;
+  hips.rotation.z = Math.sin(w) * 0.03;
+  neck.rotation.x = Math.sin(w * 2) * 0.04;
+  head.rotation.y = Math.sin(w * 0.5) * 0.08;
+}
+
+// ── a baked clip for export: sample the walk into keyframe tracks ──
+function bakeClip(frames = 24) {
+  const nodes = [hips, neck, head, ...legs.flatMap((l) => [l.hip, l.knee])], tracks = [];
+  const times = [], buf = new Map(nodes.map((n) => [n, { p: [], q: [] }]));
+  for (let i = 0; i <= frames; i++) {
+    const t = (i / frames) * PERIOD;
+    walk(t); times.push(t);
+    for (const n of nodes) { buf.get(n).p.push(...n.position.toArray()); buf.get(n).q.push(...n.quaternion.toArray()); }
+  }
+  for (const n of nodes) {
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${n.name}.quaternion`, times, buf.get(n).q));
+    if (n === hips) tracks.push(new THREE.VectorKeyframeTrack(`${n.name}.position`, times, buf.get(n).p));
+  }
+  return new THREE.AnimationClip('walk', PERIOD, tracks);
+}
+const clip = bakeClip();
+window.exportGlb = async () => {
+  const t1 = performance.now();
+  const buf = await new GLTFExporter().parseAsync(capy, { binary: true, animations: [clip] });
+  window.glb = buf;
+  return { bytes: buf.byteLength, ms: +(performance.now() - t1).toFixed(1) };
+};
+
+// ── optional: the Tripo capybara beside it, same height, playing its own walk ──
+let tripoMixer, tripoAction;
+if (q.get('tripo') === '1') {
+  const gltf = await new GLTFLoader().loadAsync('data/capybara_walk.glb');
+  const t = gltf.scene, box = new THREE.Box3().setFromObject(t), s = 0.78 / box.getSize(new THREE.Vector3()).y;
+  t.scale.setScalar(s);
+  t.position.set(0, -box.min.y * s, 0);
+  scene.add(t);
+  // side by side along the screen's horizontal axis, whatever the camera yaw
+  const side = new THREE.Vector3(Math.cos(THREE.MathUtils.degToRad(+(q.get('yaw') ?? 55))), 0, -Math.sin(THREE.MathUtils.degToRad(+(q.get('yaw') ?? 55))));
+  t.position.addScaledVector(side, -0.55);
+  capy.position.addScaledVector(side, 0.5);
+  tripoMixer = new THREE.AnimationMixer(t);
+  tripoAction = tripoMixer.clipAction(gltf.animations[0]).play();
+}
+
+const yaw = THREE.MathUtils.degToRad(+(q.get('yaw') ?? 55)), d = +(q.get('dist') ?? 2.6);
+const look = new THREE.Vector3(0, 0.42, 0);
+camera.position.set(d * Math.sin(yaw), 0.42 + d * 0.32, d * Math.cos(yaw));
+camera.lookAt(look);
+window.seek = (t) => {
+  window.frozen = true; walk(t);
+  if (tripoMixer) { tripoAction.time = t % tripoAction.getClip().duration; tripoMixer.update(0); }
+  renderer.render(scene, camera);
+};
+window.ready = { buildMs, tris, parts: legs.length * 3 + 10 };
+document.getElementById('hud').textContent = JSON.stringify(window.ready);
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  if (!window.frozen) { const t = clock.getElapsedTime(); walk(t); tripoMixer?.update(clock.getDelta()); }
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
