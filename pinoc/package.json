@@ -1,0 +1,9 @@
+{
+  "name": "pinoc-poc",
+  "private": true,
+  "description": "PoC: reuse existing PINOC (Viggle) characters and animate them in a web page",
+  "dependencies": {
+    "@viggle/splat-engine-three": "0.3.0",
+    "three": "0.186.0"
+  }
+}

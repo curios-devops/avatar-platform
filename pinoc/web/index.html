@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PINOC · personaje 3DGS animado (PoC)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #d9d6cf; font: 13px system-ui; overflow: hidden; }
+  canvas { display: block; }
+  #ui { position: fixed; left: 10px; top: 10px; width: 300px; background: #fffc; border-radius: 8px; padding: 10px; display: grid; gap: 6px; }
+  #ui select, #ui button { font: inherit; width: 100%; }
+  #ui .row { display: flex; gap: 6px; }
+  #stats { white-space: pre; font: 11px ui-monospace, monospace; color: #333; }
+  #err { white-space: pre-wrap; font: 11px ui-monospace, monospace; color: #a00; max-height: 30vh; overflow: auto; }
+  label { color: #555; }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "/node_modules/three/build/three.module.js",
+  "three/addons/": "/node_modules/three/examples/jsm/",
+  "three/webgpu": "/node_modules/three/build/three.webgpu.js",
+  "three/tsl": "/node_modules/three/build/three.tsl.js",
+  "@viggle/splat-engine-three": "/node_modules/@viggle/splat-engine-three/dist/index.js",
+  "@viggle/splat-engine-three/webgpu": "/node_modules/@viggle/splat-engine-three/dist/webgpu.js",
+  "zstddec": "/node_modules/zstddec/dist/zstddec.mjs"
+} }</script>
+</head>
+<body>
+<div id="ui">
+  <b>PINOC → three.js (Viggle Splat Engine)</b>
+  <div id="auth">comprobando acceso…</div>
+  <label>Personaje</label><select id="char"></select>
+  <label>Clip de reposo</label><select id="idle"></select>
+  <label>Clip de movimiento</label><select id="move"></select>
+  <button id="load">Cargar</button>
+  <div class="row"><button id="bIdle">Reposo</button><button id="bMove">Movimiento</button><button id="bStop">Pose base</button></div>
+  <label>Cabeza (giro, en tiempo real) <span id="yawv">0°</span></label><input id="yaw" type="range" min="-40" max="40" value="0">
+  <div id="stats"></div>
+  <div id="err"></div>
+</div>
+<script type="module">
+// Rendering only. Assets come from the broker (server.py) through /api/* and /assets/*; this page holds
+// no credential and never calls Viggle itself. URL params make a run reproducible:
+//   ?char=char_… | local:file.vsplat  &idle=mot_… | local:file.glb  &move=…  &rig=metahuman  &backend=webgl|webgpu  &auto=1
+import * as THREE from 'three';
+
+const q = new URLSearchParams(location.search);
+const $ = (id) => document.getElementById(id);
+const errors = [];
+const fail = (stage, e) => {
+  const msg = `[${stage}] ${e?.message ?? e}`;
+  errors.push(msg); $('err').textContent = errors.join('\n'); console.error(msg, e);
+  window.state.errors = errors;
+};
+window.state = { errors, stage: 'init' };
+const api = async (path) => {
+  const r = await fetch(path);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`${path} → HTTP ${r.status} ${body.error?.code ?? ''}: ${body.error?.message ?? ''}`);
+  return body;
+};
+
+// ── renderer: WebGL by default, WebGPU on request (and only if it really runs on WebGPU) ──
+const backend = q.get('backend') ?? 'webgl';
+const lib = backend === 'webgpu' ? await import('@viggle/splat-engine-three/webgpu') : await import('@viggle/splat-engine-three');
+let renderer;
+if (backend === 'webgpu') {
+  const { WebGPURenderer } = await import('three/webgpu');
+  renderer = new WebGPURenderer({ antialias: false });
+  await renderer.init();
+  if (renderer.backend.isWebGPUBackend !== true) { fail('renderer', 'WebGPU no disponible: usa ?backend=webgl'); }
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // splats blend in sRGB, as the README advises
+} else {
+  renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xd9d6cf);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(1.2, 48), new THREE.MeshBasicMaterial({ color: 0xc9c5bc }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.05, 50);
+// frame a standing figure of height h (feet at y=0), a little off-axis so it reads as 3D
+const frameTo = (h, zoom = 1) => {
+  const d = (h * 0.62) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / zoom, yaw = THREE.MathUtils.degToRad(+(q.get('yaw') ?? 20));
+  camera.position.set(d * Math.sin(yaw), h * 0.55, d * Math.cos(yaw)); camera.lookAt(0, h * 0.5, 0);
+};
+frameTo(1.75);
+lib.SplatEngine.shared.camera = camera;
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+
+// ── asset menus: account assets from the API, plus local files (e.g. fetched through the MCP) ──
+const rig = q.get('rig') ?? 'metahuman';
+const urlFor = (kind, v) => v.startsWith('local:') ? `/assets/${encodeURIComponent(v.slice(6))}`
+  : kind === 'char' ? `/api/characters/${v}/vsplat` : `/api/motions/${v}/glb?rig=${rig}`;
+async function menus() {
+  const status = await api('/api/status');
+  window.state.auth = status;
+  $('auth').textContent = status.key === 'valid' ? `API Viggle: clave válida · créditos ${status.credits?.balance}`
+    : status.key === 'missing' ? 'API Viggle: falta VIGLE_K_API_KEY (solo assets locales)'
+    : `API Viggle: clave rechazada (${status.error?.code})`;
+  if (status.key === 'rejected') fail('auth', `${status.error?.code}: ${status.error?.message}`);
+  const local = (await api('/api/local')).data;
+  let chars = [], motions = [];
+  if (status.key === 'valid') {
+    try { chars = (await api('/api/characters')).data; } catch (e) { fail('list characters', e); }
+    try { motions = (await api('/api/motions')).data; } catch (e) { fail('list motions', e); }
+  }
+  window.state.assets = { characters: chars.map(({ id, name, status, type, vsplat }) => ({ id, name, status, type, vsplat })),
+    motions: motions.map(({ id, name, status, type, glb }) => ({ id, name, status, type, glb: glb?.status })), local };
+  const fill = (sel, items) => { sel.innerHTML = items.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); };
+  fill($('char'), [...chars.filter((c) => c.vsplat?.status === 'ready').map((c) => [c.id, `${c.name || c.id} (API)`]),
+    ...local.filter((f) => /\.(vsplat|bin)$/.test(f)).map((f) => [`local:${f}`, `${f} (local)`])]);
+  const clipItems = [...motions.filter((m) => m.glb?.status === 'ready').map((m) => [m.id, `${m.name || m.id} (API)`]),
+    ...local.filter((f) => f.endsWith('.glb')).map((f) => [`local:${f}`, `${f} (local)`])];
+  fill($('idle'), clipItems); fill($('move'), clipItems);
+  for (const k of ['char', 'idle', 'move']) if (q.get(k)) $(k).value = q.get(k);
+  if (!$('char').options.length) fail('assets', 'no hay ningún personaje con vsplat listo (ni en la API ni en pinoc/assets/)');
+}
+
+// ── load and play ──
+let character = null, clips = {}, yawDeg = 0, frames = 0, fps = 0, lastFps = performance.now();
+async function load() {
+  window.state.stage = 'loading';
+  try {
+    character?.removeFromParent(); character?.dispose(); character = null;
+    const t0 = performance.now();
+    character = await new lib.VSplatLoader().loadAsync(urlFor('char', $('char').value));
+    const tChar = performance.now() - t0;
+    scene.add(character);
+    const loader = new lib.SplatClipLoader();
+    const t1 = performance.now();
+    clips = { idle: await loader.loadAsync(urlFor('clip', $('idle').value)) };
+    clips.move = $('move').value === $('idle').value ? clips.idle : await loader.loadAsync(urlFor('clip', $('move').value));
+    const tClips = performance.now() - t1;
+    // real-time head control on top of whatever clip plays (the engine's documented PoseModifier hook)
+    const names = character.boneNames, head = names.indexOf('head');
+    const turn = new lib.Quat();
+    character.armature.poseModifier = head < 0 ? null : (pose) => {
+      if (!yawDeg) return;
+      turn.setFromEulerAngles(0, 0, yawDeg); // MetaHuman head bone: local x forward, y sideways, z down → yaw is about z
+      pose.rotations[head].mul(turn);
+    };
+    // the engine's default root pinning leaves PINOC characters facing -Z; turn them to the camera
+    if (q.get('flip') !== '0') character.rotation.y = Math.PI;
+    character.play(clips.idle, { loop: true }); character.update(0);
+    const headM = character.getBoneWorldMatrix('head'), headY = headM ? new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(headM.data ?? headM.elements)).y : 1.6;
+    frameTo(headY + 0.15, +(q.get('zoom') ?? 1));
+    const splats = character.splats.reduce((a, s) => a + (s.numSplats ?? 0), 0);
+    window.state = { ...window.state, stage: 'ready', loadMs: { character: Math.round(tChar), clips: Math.round(tClips) },
+      bones: names.length, headBone: head, facialBones: names.filter((n) => n.startsWith('FACIAL_')).length, splats,
+      clipDur: { idle: clips.idle.duration ?? null, move: clips.move.duration ?? null }, backend, height: +(headY + 0.15).toFixed(2) };
+    window.state.playing = 'idle';
+  } catch (e) { fail('load', e); window.state.stage = 'failed'; }
+}
+const toIdle = () => { if (!character) return; character.crossFadeTo(clips.idle, 0.35); window.state.playing = 'idle'; };
+const toMove = () => { if (!character) return; character.crossFadeTo(clips.move, 0.35); window.state.playing = 'move'; };
+$('load').onclick = load; $('bIdle').onclick = toIdle; $('bMove').onclick = toMove;
+$('bStop').onclick = () => { character?.stop(0.3); window.state.playing = 'rest'; };
+$('yaw').oninput = (e) => { yawDeg = +e.target.value; $('yawv').textContent = `${yawDeg}°`; };
+window.demo = { load, toIdle, toMove, setYaw: (d) => { yawDeg = d; }, get character() { return character; }, camera, renderer, scene };
+
+try { await menus(); } catch (e) { fail('menus', e); }
+if (q.get('auto') === '1' && $('char').options.length) await load();
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  try { character?.update(dt); } catch (e) { fail('update', e); renderer.setAnimationLoop(null); }
+  renderer.render(scene, camera);
+  frames++;
+  const now = performance.now();
+  if (now - lastFps > 1000) {
+    fps = (frames * 1000) / (now - lastFps); frames = 0; lastFps = now; window.state.fps = +fps.toFixed(1);
+    const s = window.state;
+    $('stats').textContent = `backend ${backend} · ${fps.toFixed(0)} fps\n` + (s.stage === 'ready'
+      ? `splats ${s.splats} · huesos ${s.bones} (faciales ${s.facialBones})\ncarga personaje ${s.loadMs.character} ms · clips ${s.loadMs.clips} ms\nreproduciendo: ${s.playing}` : s.stage);
+  }
+});
+</script>
+</body>
+</html>

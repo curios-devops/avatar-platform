@@ -1,0 +1,5 @@
+node_modules/
+cache/
+assets/
+logs/
+.mcp_token.json
