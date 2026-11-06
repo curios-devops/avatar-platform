@@ -134,6 +134,9 @@ def load_proxy(mhclo: str) -> Proxy:
             section = "verts"
         elif key in ("x_scale", "y_scale", "z_scale"):
             scales[key[0]] = (int(parts[1]), int(parts[2]), float(parts[3]))
+        elif key in ("shear_x", "shear_y", "shear_z", "l_shear_x", "l_shear_y", "l_shear_z") and key[-1] not in scales:
+            # MakeClothes 1 files give the same per-axis scale as two vertices and their original coordinates
+            scales[key[-1]] = (int(parts[1]), int(parts[2]), abs(float(parts[3]) - float(parts[4])))
         elif key == "obj_file":
             obj_file = parts[1]
         elif key == "material":

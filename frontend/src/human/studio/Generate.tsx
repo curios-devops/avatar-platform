@@ -20,7 +20,7 @@ export function Generate() {
     const say = (s: string) => setLog((l) => [...l.slice(-30), s]);
     (async () => {
       const cat = (await (await fetch(`${HUMAN_URL}/catalog`)).json()) as Catalog;
-      const only = new URLSearchParams(location.search).get('only'); // e.g. only=char or only=hair
+      const only = new URLSearchParams(location.search).get('only'); // e.g. only=char or only=hair_elvs,char_mei
       type Job = { name: string; avatar: Avatar; isolate: string[] | null; yaw?: number; frame: () => void };
       const jobs: Job[] = [];
       for (const c of CHARACTERS) {
@@ -46,7 +46,7 @@ export function Generate() {
       }
       for (const job of jobs) {
         if (stop) return;
-        if (only && !job.name.startsWith(only)) continue;
+        if (only && !only.split(',').some((p) => job.name.startsWith(p))) continue;
         try {
           await engine.load(await bake(cat, job.avatar), lookOf(cat, job.avatar));
           engine.setYaw(job.yaw ?? 0);

@@ -107,6 +107,8 @@ export const Arc = forwardRef<ArcHandle, Props>(function Arc({ items, selected, 
         el.style.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : '';
         el.style.zIndex = String(a < 1 && variant === 'card' ? 1 : Math.round(100 - 10 * a));
         el.style.visibility = op * ie < 0.01 ? 'hidden' : 'visible';
+        const g = el.querySelector<HTMLElement>('.g[data-src]'); // cards fetch their picture once they show
+        if (g && op * ie >= 0.01) { g.style.backgroundImage = `url(${g.dataset.src})`; delete g.dataset.src; }
       });
       if (items.length && !s.dragging && Math.abs(s.target - s.pos) < 0.02) {
         const idx = mod(Math.round(s.target), n);
@@ -131,7 +133,7 @@ export const Arc = forwardRef<ArcHandle, Props>(function Arc({ items, selected, 
           <div key={`${it.key}-${i}`} className="card glass" data-slot={i}>
             {it.none ? <div className="none">∅</div>
               : it.swatch ? <div className="swatch" style={{ background: it.swatch }} />
-              : <div className="g" style={{ backgroundImage: it.img ? `url(${it.img})` : undefined }} />}
+              : <div className="g" data-src={it.img} />}
             <div className="n">{it.title}</div>
             {it.sub && <div className="p">{it.sub}</div>}
             <span className="sheen" />

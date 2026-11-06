@@ -63,13 +63,22 @@ export const Hanger = forwardRef<ArcHandle, { items: HangItem[]; selected: numbe
           const x = cx + Math.sign(u) * (k * fg + Math.max(0, a - 1) * sg);
           const sc = 1 + 0.12 * (1 - k);
           const swing = REDUCED ? 0 : Math.max(-7, Math.min(7, speed * 5)) * (0.4 + 0.6 * k) + Math.sin(t * 1.2 + i * 1.9) * 0.5 * k;
+          const onScreen = x < W() + 200 && x > -200;
           el.style.transform = `translateX(${x}px) rotate(${swing.toFixed(2)}deg) scale(${sc})`;
           el.style.zIndex = String(100 - Math.round(a * 10));
-          el.style.opacity = String(x > W() + 200 || x < -200 ? 0 : 1);
+          el.style.opacity = String(onScreen ? 1 : 0);
           el.classList.toggle('on', a < 0.5);
           // turn: 0° in front, 90° (profile) from one slot away; cross-fade the two nearest frames
           const deg = 90 * k;
           const frames = el.querySelectorAll<HTMLElement>('.turn');
+          // load lazily: off-screen pieces fetch nothing, the rest only the profile they show, and the
+          // pieces next to the front all their angles before they turn (the hair rail is ~18 MB in full)
+          if (onScreen) frames.forEach((fr, j) => {
+            if (fr.dataset.src && (a < 2.2 || j === frames.length - 1)) {
+              fr.style.backgroundImage = `url(${fr.dataset.src})`;
+              delete fr.dataset.src;
+            }
+          });
           if (frames.length > 1) {
             const f = deg / 30, lo = Math.floor(f), mix = f - lo;
             frames.forEach((fr, j) => { fr.style.opacity = String(j === lo ? 1 - mix : j === lo + 1 ? mix : 0); });
@@ -95,7 +104,7 @@ export const Hanger = forwardRef<ArcHandle, { items: HangItem[]; selected: numbe
             <span className="hook" />
             <div className="img">
               {(it.turns ?? (it.img ? [it.img] : [])).map((src, j) => (
-                <div key={j} className="turn" style={{ backgroundImage: `url(${src})` }} />
+                <div key={j} className="turn" data-src={src} />
               ))}
               {it.none && <div className="nil">∅</div>}
               {it.swatch && !it.img && <div className="sw" style={{ background: it.swatch }} />}

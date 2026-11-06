@@ -21,7 +21,7 @@ const mix = (african: number, asian: number, caucasian: number) => ({ african, a
 export const CHARACTERS: Character[] = [
   { id: 'lucia', name: 'Lucía', age: 26, note: L('Latina, Bogotá', 'Latina, Bogotá'),
     pheno: { gender: 0, age: 0.45, muscle: 0.45, weight: 0.45, height: 0.45, proportions: 0.6, ...mix(0.2, 0.25, 0.55) },
-    skin: 'toigo_light_skin_female_bronze', hair: 'long01', hairColor: '#3a2618', eyes: 'brown',
+    skin: 'toigo_light_skin_female_bronze', hair: 'elvs_hazel_hair', hairColor: '#3a2618', eyes: 'brown',
     clothes: ['female_casualsuit02', 'shoes02'], accessories: [{ id: 'hoops' }] },
   { id: 'kwame', name: 'Kwame', age: 31, note: L('Tall, athletic', 'Alto, atlético'),
     pheno: { gender: 1, age: 0.5, muscle: 0.82, weight: 0.45, height: 0.82, proportions: 0.6, ...mix(0.95, 0, 0.05) },
@@ -29,7 +29,7 @@ export const CHARACTERS: Character[] = [
     clothes: ['male_casualsuit03', 'shoes03'] },
   { id: 'mei', name: 'Mei', age: 24, note: L('Petite, Shanghai', 'Menuda, Shanghái'),
     pheno: { gender: 0, age: 0.42, muscle: 0.4, weight: 0.3, height: 0.3, proportions: 0.55, ...mix(0, 0.95, 0.05) },
-    skin: 'young_asian_female', hair: 'bob01', hairColor: '#141414', eyes: 'brown',
+    skin: 'young_asian_female', hair: 'elvs_short_side_do', hairColor: '#141414', eyes: 'brown',
     clothes: ['female_casualsuit01', 'shoes01'] },
   { id: 'erik', name: 'Erik', age: 35, note: L('Nordic, very tall', 'Nórdico, muy alto'),
     pheno: { gender: 1, age: 0.55, muscle: 0.6, weight: 0.5, height: 0.95, proportions: 0.6, ...mix(0, 0, 1) },
@@ -37,7 +37,7 @@ export const CHARACTERS: Character[] = [
     clothes: ['male_casualsuit01', 'shoes04'] },
   { id: 'rosa', name: 'Rosa', age: 75, note: L('Grandmother, Seville', 'Abuela, Sevilla'),
     pheno: { gender: 0, age: 0.95, muscle: 0.3, weight: 0.62, height: 0.3, proportions: 0.45, ...mix(0.05, 0.1, 0.85) },
-    skin: 'old_caucasian_female', hair: 'bob02', hairColor: '#b8b8b4', eyes: 'brownlight',
+    skin: 'old_caucasian_female', hair: 'elvs_50s_updo', hairColor: '#b8b8b4', eyes: 'brownlight',
     clothes: ['female_elegantsuit01', 'shoes01'], tints: { female_elegantsuit01: '#4a3b5c' }, accessories: [{ id: 'glasses' }] },
   { id: 'hiroshi', name: 'Hiroshi', age: 70, note: L('Retired, Osaka', 'Jubilado, Osaka'),
     pheno: { gender: 1, age: 0.9, muscle: 0.35, weight: 0.4, height: 0.38, proportions: 0.5, ...mix(0, 1, 0) },
@@ -45,7 +45,7 @@ export const CHARACTERS: Character[] = [
     clothes: ['male_elegantsuit01', 'shoes04'] },
   { id: 'amara', name: 'Amara', age: 40, note: L('Curvy, Lagos', 'Con curvas, Lagos'),
     pheno: { gender: 0, age: 0.6, muscle: 0.4, weight: 0.88, height: 0.5, proportions: 0.5, ...mix(0.9, 0, 0.1) },
-    skin: 'middleage_african_female', hair: 'afro01', hairColor: '#161210', eyes: 'brown',
+    skin: 'middleage_african_female', hair: 'punkduck_alpha7_curly2', hairColor: '#161210', eyes: 'brown',
     clothes: ['female_casualsuit02', 'shoes02'], tints: { female_casualsuit02: '#c2462e' }, accessories: [{ id: 'hoops' }] },
   { id: 'diego', name: 'Diego', age: 8, note: L('Kid, Lima', 'Niño, Lima'),
     pheno: { gender: 1, age: 0.12, muscle: 0.45, weight: 0.5, height: 0.5, proportions: 0.5, ...mix(0.15, 0.35, 0.5) },
@@ -61,7 +61,7 @@ export const CHARACTERS: Character[] = [
     clothes: ['male_worksuit01', 'shoes02'] },
   { id: 'sofia', name: 'Sofía', age: 15, note: L('Teen, Mexico City', 'Adolescente, CDMX'),
     pheno: { gender: 0, age: 0.3, muscle: 0.45, weight: 0.4, height: 0.45, proportions: 0.55, ...mix(0.1, 0.4, 0.5) },
-    skin: 'young_caucasian_female2', hair: 'ponytail01', hairColor: '#4a2e1c', eyes: 'brown',
+    skin: 'young_caucasian_female2', hair: 'elvs_keylth_hair', hairColor: '#4a2e1c', eyes: 'brown',
     clothes: ['female_sportsuit01', 'shoes06'] },
   { id: 'jamal', name: 'Jamal', age: 20, note: L('Slim, Atlanta', 'Delgado, Atlanta'),
     pheno: { gender: 1, age: 0.38, muscle: 0.5, weight: 0.22, height: 0.62, proportions: 0.6, ...mix(0.9, 0, 0.1) },
@@ -113,6 +113,20 @@ export const TINTS: [string, string][] = [
   [L('Sage', 'Salvia'), '#a9b59c'], [L('Sky', 'Cielo'), '#b9cde0'], [L('Navy', 'Marino'), '#2a3550'],
   [L('Brick', 'Teja'), '#b5523b'], [L('Charcoal', 'Carbón'), '#3a3b3f'],
 ];
+// Strand-textured hair cards (hair02/hair03, CC-BY) read far more like real hair than the system
+// shells, so they lead the list; the rest follow in catalog order.
+const HAIR_FIRST = [
+  'elvs_hazel_hair', 'elvs_daisy_hair', 'elvs_adrienne_hair', 'elvs_ashley_may_hair', 'elvs_lady_hippy_hair',
+  'elvs_keylth_hair', 'elvs_katherine_hair', 'elvs_short_daisy_hair', 'elvs_island_princess_hair', 'elvs_that_80s_babe_hair',
+  'punkduck_alpha7_curly2', 'punkduck_alpha7_curly', 'punkduck_alpha7_long2', 'elvs_inverted_curly_bob', 'elvs_witchy_lil_bob',
+  'elvs_short_side_do', 'elvs_wavy_bob', 'elvs_50s_updo', 'elvs_braid_bun', 'elvs_lara_hair', 'elvs_micky_afro',
+  'elvs_braided_rows', 'elvs_grump_hair', 'elvs_maxwell_hair',
+];
+export const sortHair = <T extends { id: string }>(hair: T[]) => {
+  const rank = (id: string) => { const i = HAIR_FIRST.indexOf(id); return i < 0 ? HAIR_FIRST.length : i; };
+  return [...hair].sort((a, b) => rank(a.id) - rank(b.id));
+};
+
 export const HAIR_TINTS: [string, string][] = [
   [L('Natural', 'Natural'), '#ffffff'], [L('Black', 'Negro'), '#141414'], [L('Dark brown', 'Castaño oscuro'), '#3a2618'],
   [L('Brown', 'Castaño'), '#6b4428'], [L('Blonde', 'Rubio'), '#d8b278'], [L('Copper', 'Cobrizo'), '#9a4a26'],
@@ -133,8 +147,8 @@ export const PROMPTS = {
     ? ['Ponle aros dorados', 'Cambia la ropa a blanco', 'Ropa deportiva y zapatillas', 'Gafas de sol', 'Algo elegante para una cena']
     : ['Add gold hoop earrings', 'Make the outfit white', 'Sportswear and sneakers', 'Sunglasses', 'Something smart for dinner'],
   character: es
-    ? ['Más alta y atlética', 'Que tenga unos 60 años', 'Pelo corto y rubio', 'Ojos verdes', 'Que sonría']
-    : ['Taller and athletic', 'Make them about 60', 'Short blond hair', 'Green eyes', 'Make them smile'],
+    ? ['Más alta y atlética', 'Que tenga unos 60 años', 'Pelo largo y castaño', 'Ojos verdes', 'Que sonría']
+    : ['Taller and athletic', 'Make them about 60', 'Long brown hair', 'Green eyes', 'Make them smile'],
 };
 
 export const FACE_GROUPS: { name: string; keys: [string, string][] }[] = [

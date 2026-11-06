@@ -10,7 +10,7 @@ import { Arc, type ArcHandle, type ArcItem } from './Arc';
 import { ANGLES, Hanger, type HangItem } from './Hanger';
 import { liquidGlass } from './liquid';
 import {
-  ACCESSORIES, BACKDROPS, CHARACTERS, FACE_GROUPS, FIT_TABS, GARMENT_NAMES, HAIR_TINTS, L, PROMPTS, TINTS, categoryOf, es,
+  ACCESSORIES, BACKDROPS, CHARACTERS, FACE_GROUPS, FIT_TABS, GARMENT_NAMES, HAIR_TINTS, L, PROMPTS, TINTS, categoryOf, es, sortHair,
   type Category,
 } from './presets';
 import { HUMAN_URL, bake, bakeBody, cut, faceKeys, fromCharacter, lookOf, type Avatar, type Catalog } from './avatar';
@@ -36,7 +36,7 @@ const PART_LABEL: Record<string, string> = {
 };
 /** "cortu shaggy green hair" → "Shaggy green", "long01" → "Long 01": the CC0 packs name hair by file. */
 const hairName = (label: string) => {
-  const t = label.replace(/^(cortu|culturalibre|elvs|toigo|sonntag78|o4saken|faydaen|littleright|rehmanpolanski)[ _]/, '')
+  const t = label.replace(/^(cortu|culturalibre|elvs|toigo|sonntag78|o4saken|faydaen|littleright|rehmanpolanski|grinsegold|punkduck alpha7)[ _]/, '')
     .replace(/[_-]+/g, ' ').replace(/\bhair\b/gi, '').replace(/([a-z])(\d+)$/i, '$1 $2').replace(/\s+/g, ' ').trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
@@ -92,7 +92,7 @@ export function Studio({ serverUrl, onBack }: { serverUrl: string; onBack: () =>
     s.connect();
     speech.current = s;
     e.mouth = () => s.mouth();
-    fetch(`${HUMAN_URL}/catalog`).then((r) => r.json()).then(setCatalog)
+    fetch(`${HUMAN_URL}/catalog`).then((r) => r.json()).then((c: Catalog) => setCatalog({ ...c, hair: sortHair(c.hair) }))
       .catch(() => flash(L('Start the human service on port 8010', 'Arranca el servicio humano en el puerto 8010'), true));
     return () => { s.close(); e.dispose(); };
   }, [serverUrl, flash]);

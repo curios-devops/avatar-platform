@@ -59,9 +59,29 @@ Fecha: 2026-11-04 · Rama: `exp/three-human` · Decide: Marcelo
 - **Pesado:** son cuatro redes (Set DiT de 181 M parámetros y otras), más DINOv3 ViT-L, SAM 3 y BiRefNet. Pesan unos 2,45 GB y necesitan GPU NVIDIA o MPS, más Blender 4.2.
 - **Estilo equivocado:** su salida son unas 69 tarjetas de pelo estilo VRoid/anime, sin texturas.
 
-Lo único reutilizable es la idea de tarjetas barridas con marco de Bishop y el muelle de huesos para que el pelo se mueva. El siguiente paso realista y barato serían tarjetas de pelo CC0 con textura de hebras (MB, no GB).
+Lo único reutilizable es la idea de tarjetas barridas con marco de Bishop y el muelle de huesos para que el pelo se mueva. El paso barato que sí se hizo fue usar tarjetas de pelo con textura de hebras (MB, no GB); ver abajo.
 
-**Percha:** zapatos, sombreros, pelo y accesorios también giran (4 ángulos cada uno, 246 recortes en total, unos 14 MB).
+**Tarjetas de pelo (hecho):** se añadieron los packs oficiales de la comunidad MakeHuman `hair02` (21 peinados de Elvaerwyn) y `hair03` (14 peinados de punkduck, culturalibre y grinsegold).
+- **Licencia y peso:** son CC-BY 4.0 (créditos en `human/CREDITS.md`) y ocupan unos 150 MB en `assets_src`, fuera de git.
+- **Por qué se ven mejor:** son tarjetas con hebras en el alfa (entre 1.500 y 20.000 polígonos y entre 25 y 44 % de píxeles semitransparentes), no cáscaras. No necesitan GPU ni entrenamiento.
+- **Dos arreglos necesarios:**
+  - `baker.py` ahora lee la escala `l_shear_*` de MakeClothes 1. Sin eso, seis peinados salían reventados a 10× de tamaño.
+  - `fix_pngs.py` quita perfiles `iCCP` con CRC roto. Por ese chunk, 8 texturas no cargaban ni en Chrome ni en Pillow.
+- **En el estudio:** las tarjetas encabezan la lista de pelo. Lucía, Amara, Sofía, Rosa y Mei las llevan (hazel, alpha7_curly2, keylth, 50s_updo, short_side_do).
+- **Recortes:** los de pelo y accesorios se guardan a 720 px de alto. Los 69 peinados × 4 ángulos ocupan unos 18 MB.
+- **Comparativas:** `.triage/hair/sheet_*.jpg`.
+
+**Percha:** zapatos, sombreros, pelo y accesorios también giran (4 ángulos cada uno, 386 recortes en total, unos 23 MB).
+- **Carga diferida:** la percha solo pide el perfil de lo que está en pantalla y los 4 ángulos de lo que está junto al centro. El arco pide cada tarjeta cuando se hace visible.
+- **Resultado:** abrir Pelo pasó de unos 18 MB (276 imágenes) a 1,7 MB (20 imágenes).
+
+**Pelo, versión estándar (2026-11-06).** Personaje → Pelo es solo un selector de peinados, largos y
+cortos tal como vienen modelados, y un color. Los peinados con textura de mechones (hair02/hair03)
+van primero.
+
+- **Retirado: la peluquería.** Se probó una con corte por largo, mechas en las puntas y las órdenes
+  `haircut` y `tips`. Marcelo la quitó por demasiado compleja para el estudio.
+- **El largo** se elige con el peinado.
 
 **Pendiente:**
 - La ropa CC0 de MakeHuman es limitada: 12 conjuntos y casi todo vaqueros y camisetas.

@@ -27,7 +27,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http
 
 CACHE = Path(__file__).parent / "out" / "cache"
 CACHE.mkdir(parents=True, exist_ok=True)
-PACKS = ["makehuman_system_assets_cc0", "skins01_cc0", "skins02_cc0", "hair01_cc0"]
+# hair02/hair03 are CC-BY (credit Elvaerwyn, punkduck, culturalibre, grinsegold): strand-textured hair cards
+PACKS = ["makehuman_system_assets_cc0", "skins01_cc0", "skins02_cc0", "hair01_cc0", "hair02_ccby", "hair03_ccby"]
 # Proxies with missing pieces or non-human shapes stay out of the catalog.
 SKIP = {"toon01", "young_caucasian_female_special_suit", "young_caucasian_male_special_suit", "learning_anime_hair"}
 
@@ -74,7 +75,8 @@ def catalog():
             "teeth": f"{PACKS[0]}/teeth/teeth_base/teeth_base.mhclo",
             "tongue": f"{PACKS[0]}/tongue/tongue01/tongue01.mhclo",
         },
-        "license": "Anny (NAVER) Apache-2.0; MakeHuman assets CC0 1.0",
+        "license": "Anny (NAVER) Apache-2.0; MakeHuman assets CC0 1.0; hair02/hair03 hair CC-BY 4.0 "
+                   "(Elvaerwyn, punkduck, culturalibre, grinsegold via makehumancommunity.org)",
     }
 
 
@@ -192,7 +194,8 @@ def studio_get(name: str):
 
 @app.post("/studio/{name}")
 async def studio_put(name: str, request: Request):
-    """Store a cut-out: trim the transparent border, keep a small margin, cap the height at 1100 px."""
+    """Store a cut-out: trim the transparent border, keep a small margin, cap the height at 1100 px
+    (720 for hair and accessories, which the closet shows small; curly hair cards are heavy at full size)."""
     if not NAME.match(name):
         raise HTTPException(400, "bad name")
     img = Image.open(io.BytesIO(await request.body())).convert("RGBA")
@@ -203,7 +206,8 @@ async def studio_put(name: str, request: Request):
     pad = max(4, img.height // 40)
     canvas = Image.new("RGBA", (img.width + 2 * pad, img.height + 2 * pad))
     canvas.paste(img, (pad, pad))
-    if canvas.height > 1100:
-        canvas = canvas.resize((round(canvas.width * 1100 / canvas.height), 1100), Image.LANCZOS)
+    cap = 720 if name.startswith(("hair_", "acc_")) else 1100
+    if canvas.height > cap:
+        canvas = canvas.resize((round(canvas.width * cap / canvas.height), cap), Image.LANCZOS)
     canvas.save(STUDIO / f"{name}.webp", "WEBP", quality=88, method=5)
     return {"name": name, "size": canvas.size}
