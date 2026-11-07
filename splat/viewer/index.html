@@ -38,11 +38,14 @@ window.shot(+(q.get('yaw') ?? 0), +(q.get('dist') ?? 4.2), +(q.get('h') ?? 0.9))
 
 const t0 = performance.now();
 const splat = new SplatMesh({ url: q.get('ply'), lod: q.get('lod') === '1' ? undefined : false });
-// ?rx=180 turns a y-down (OpenCV) splat upright; ?ry spins it to face +Z; ?y lifts it
+// ?rx=180 turns a y-down (OpenCV) splat upright; ?ry spins it to face +Z; ?y lifts it; ?z pulls a scene
+// splat (SHARP puts the subject metres down the camera axis) onto the orbit centre
 splat.rotation.set(THREE.MathUtils.degToRad(+(q.get('rx') ?? 0)), THREE.MathUtils.degToRad(+(q.get('ry') ?? 0)), 0, 'YXZ');
 splat.position.y = +(q.get('y') ?? 0);
+splat.position.z = +(q.get('z') ?? 0);
 splat.scale.setScalar(+(q.get('s') ?? 1));
 scene.add(splat);
+window.splat = splat; // for DevTools: re-centre or re-orient a loaded splat without a reload
 splat.initialized.then(() => {
   window.ready = { ms: Math.round(performance.now() - t0), splats: splat.numSplats };
   document.getElementById('hud').textContent = `${q.get('ply')} · ${splat.numSplats} splats · ${window.ready.ms} ms`;
