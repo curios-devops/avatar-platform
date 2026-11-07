@@ -51,7 +51,7 @@ class ConversationSession:
 
     def _lipsync_enabled(self) -> bool:
         from ..config import settings
-        return bool(self.avatar_id and settings.RUNPOD_MUSETALK_ENDPOINT_ID)
+        return bool(settings.ORCH_MUSETALK_ENABLED and self.avatar_id and settings.RUNPOD_MUSETALK_ENDPOINT_ID)
 
     def _msg(self, **kw) -> MensajeContrato:
         m = MensajeContrato(session_id=self.session_id, seq=self.seq, **kw)

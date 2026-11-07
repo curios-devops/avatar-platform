@@ -75,6 +75,28 @@ void main() {`)
   m.anisotropy = HAIR.anisotropy;
   m.anisotropyRotation = HAIR.rotation;
 }
+/**
+ * Mouth interior: teeth and tongue were lit like the face, so an open mouth read as a bright pink box with no
+ * depth. Light dies quickly behind the lips: each fragment is darkened by its depth behind the front incisors,
+ * and more when the jaw is nearly shut (less light gets in). The uniforms follow the head bone every frame.
+ */
+type MouthUniforms = { uMouthFront: { value: THREE.Vector3 }; uMouthFwd: { value: THREE.Vector3 }; uMouthOpen: { value: number } };
+function mouthShader(m: THREE.MeshPhysicalMaterial, kind: 'teeth' | 'tongue', u: MouthUniforms) {
+  const floor = kind === 'teeth' ? '0.3' : '0.14';
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('void main() {', 'varying vec3 vMouthWorld;\nvoid main() {')
+      .replace('#include <skinning_vertex>', '#include <skinning_vertex>\n  vMouthWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('void main() {', 'uniform vec3 uMouthFront;\nuniform vec3 uMouthFwd;\nuniform float uMouthOpen;\nvarying vec3 vMouthWorld;\nvoid main() {')
+      .replace('#include <opaque_fragment>', `float mouthDepth = max(0.0, dot(uMouthFront - vMouthWorld, uMouthFwd));
+  outgoingLight *= mix(${floor}, 1.0, exp(-mouthDepth / 0.009)) * mix(0.55, 1.0, uMouthOpen);
+  #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => `mouth-${kind}`;
+}
+
 /** Tunables for the hair A/B (window.__hair from the console). */
 export const HAIR = { anisotropy: 0.85, rotation: Math.PI / 2 };
 (globalThis as any).__hair = HAIR;
@@ -110,6 +132,10 @@ export class HumanEngine {
   fps = 0;
   walking = false;
   mouth: () => Weights = () => ({});
+  private mouthW: Weights = {};
+  private mouthU: MouthUniforms = { uMouthFront: { value: new THREE.Vector3() }, uMouthFwd: { value: new THREE.Vector3(0, 0, 1) }, uMouthOpen: { value: 0 } };
+  /** Front of the incisors and the face's forward axis, in head-bone space (from the bind pose). */
+  private mouthRef: { p: THREE.Vector3; f: THREE.Vector3 } | null = null;
 
   private accessories = new THREE.Group();
   private ray = new THREE.Raycaster();
@@ -243,6 +269,7 @@ export class HumanEngine {
       this.armDrop[side] = THREE.MathUtils.clamp(rest + 1.36, 0, 1.6);
     }
     this.anchorAccessories();
+    this.anchorMouth();
     this.root.rotation.y = yaw;
     await this.setLook(look);
     if (first) this.frame('bust');
@@ -318,6 +345,27 @@ export class HumanEngine {
     this.accessories.matrixAutoUpdate = false;
     this.accessories.matrix.copy(head.matrixWorld).invert();
     head.add(this.accessories);
+  }
+
+  private anchorMouth() {
+    this.mouthRef = null;
+    const head = this.bones.get(key('head'));
+    let teeth: THREE.Mesh | undefined, tongue: THREE.Mesh | undefined;
+    this.model!.traverse((o) => {
+      const kind = ((o as THREE.Mesh).material as THREE.Material | undefined)?.userData?.kind;
+      if ((o as THREE.Mesh).isMesh && kind === 'teeth') teeth = o as THREE.Mesh;
+      if ((o as THREE.Mesh).isMesh && kind === 'tongue') tongue = o as THREE.Mesh;
+    });
+    if (!head || !teeth) return;
+    // MakeHuman's teeth proxy sits a few mm high on Anny: in open vowels the upper incisors stayed behind the
+    // upper lip and only the lower row showed. Drop teeth and tongue by 5 % of the eye distance (~3 mm), the
+    // value picked on the -3/-6 mm A/B sheet (.triage/decide/mouth_before_after.jpg).
+    const iod = this.bone('eye.L').distanceTo(this.bone('eye.R')) || 0.064;
+    for (const m of [teeth, tongue]) m?.geometry.translate(0, -0.05 * iod, 0);
+    const box = new THREE.Box3().setFromBufferAttribute(teeth.geometry.getAttribute('position') as THREE.BufferAttribute).applyMatrix4(teeth.matrixWorld);
+    const front = new THREE.Vector3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, box.max.z);
+    const q = head.getWorldQuaternion(new THREE.Quaternion()).invert();
+    this.mouthRef = { p: head.worldToLocal(front), f: Z.clone().applyQuaternion(q) };
   }
 
   private buildAccessories() {
@@ -461,6 +509,7 @@ export class HumanEngine {
     });
     m.userData = extras;
     if (kind === 'hair') { m.roughness = 0.5; m.specularIntensity = 0.4; hairShader(m, this.look.hairColor); }
+    if (kind === 'teeth' || kind === 'tongue') mouthShader(m, kind, this.mouthU);
     const recolor = kind === 'clothes' ? this.look.tints?.[name] : undefined;
     if (recolor && recolor.toLowerCase() !== '#ffffff') dye(m, recolor);
     return m;
@@ -660,7 +709,21 @@ export class HumanEngine {
       this.expr[k] = THREE.MathUtils.lerp(this.expr[k] ?? 0, this.exprTarget[k] ?? 0, Math.min(1, dt * 6));
     }
     const face: Weights = { ...this.expr };
-    for (const [k, v] of Object.entries(this.mouth())) face[k] = (face[k] ?? 0) + v;
+    // coarticulation: the mouth eases towards each viseme (fast attack, slower release) instead of cutting
+    // to it, so neighbouring sounds blend the way lips and jaw actually move
+    const target = this.mouth();
+    for (const k of new Set([...Object.keys(this.mouthW), ...Object.keys(target)])) {
+      const to = target[k] ?? 0, from = this.mouthW[k] ?? 0;
+      this.mouthW[k] = from + (to - from) * (1 - Math.exp(-dt / (to > from ? 0.035 : 0.06)));
+    }
+    for (const [k, v] of Object.entries(this.mouthW)) face[k] = (face[k] ?? 0) + v;
+    if (this.mouthRef) {
+      const hb = this.bones.get(key('head'))!;
+      hb.updateWorldMatrix(true, false);
+      this.mouthU.uMouthFront.value.copy(this.mouthRef.p).applyMatrix4(hb.matrixWorld);
+      this.mouthU.uMouthFwd.value.copy(this.mouthRef.f).applyQuaternion(hb.getWorldQuaternion(new THREE.Quaternion()));
+      this.mouthU.uMouthOpen.value = THREE.MathUtils.clamp((face.jawOpen ?? 0) * 1.6, 0, 1);
+    }
     if (t > this.blinkAt + 0.16) this.blinkAt = t + 1.8 + Math.random() * 4;
     const b = t > this.blinkAt ? Math.sin(((t - this.blinkAt) / 0.16) * Math.PI) : 0;
     face.eyeBlinkLeft = Math.max(face.eyeBlinkLeft ?? 0, b);

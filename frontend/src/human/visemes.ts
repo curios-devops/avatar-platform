@@ -13,9 +13,10 @@ export const VISEME_TO_ARKIT: Record<string, Weights> = {
   SS: { jawOpen: 0.07, mouthStretchLeft: 0.35, mouthStretchRight: 0.35, mouthSmileLeft: 0.12, mouthSmileRight: 0.12 },
   nn: { jawOpen: 0.14, mouthClose: 0.1, mouthStretchLeft: 0.1, mouthStretchRight: 0.1 },
   RR: { jawOpen: 0.15, mouthFunnel: 0.35, mouthPucker: 0.25 },
-  aa: { jawOpen: 0.55, mouthLowerDownLeft: 0.25, mouthLowerDownRight: 0.25, mouthUpperUpLeft: 0.1, mouthUpperUpRight: 0.1 },
-  E: { jawOpen: 0.32, mouthStretchLeft: 0.32, mouthStretchRight: 0.32, mouthLowerDownLeft: 0.15, mouthLowerDownRight: 0.15 },
-  ih: { jawOpen: 0.22, mouthSmileLeft: 0.22, mouthSmileRight: 0.22, mouthStretchLeft: 0.12, mouthStretchRight: 0.12 },
+  aa: { jawOpen: 0.55, mouthLowerDownLeft: 0.25, mouthLowerDownRight: 0.25, mouthUpperUpLeft: 0.16, mouthUpperUpRight: 0.16 },
+  // E / ih lift the upper lip a little: in open vowels the upper incisors show, which is most of what reads as "speech"
+  E: { jawOpen: 0.32, mouthStretchLeft: 0.32, mouthStretchRight: 0.32, mouthLowerDownLeft: 0.15, mouthLowerDownRight: 0.15, mouthUpperUpLeft: 0.14, mouthUpperUpRight: 0.14 },
+  ih: { jawOpen: 0.22, mouthSmileLeft: 0.22, mouthSmileRight: 0.22, mouthStretchLeft: 0.12, mouthStretchRight: 0.12, mouthUpperUpLeft: 0.1, mouthUpperUpRight: 0.1 },
   oh: { jawOpen: 0.42, mouthFunnel: 0.55, mouthLowerDownLeft: 0.1, mouthLowerDownRight: 0.1 },
   ou: { jawOpen: 0.2, mouthPucker: 0.75, mouthFunnel: 0.25 },
 };
