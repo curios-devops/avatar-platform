@@ -138,3 +138,14 @@ página oficial.
   rig de cuadrúpedo v2.5 → `preset:quadruped:walk`.
 - `tripo/viewer/index.html`: visor de GLB rigeados. `tripo/viewer/capybara.html`: capibara
   procedural, con `?tripo=1` para el lado a lado y `window.exportGlb()` para medir.
+
+## Capibara que habla (2026-11-07, comparación de decisiones)
+
+- `tripo/specs/capybara_talk.json`: la capibara erguida con un hueso `jaw` hijo de `head`. El hocico
+  acaba en la línea de la boca, debajo va una caja de mandíbula inferior, y hay pintura oscura dentro
+  de la boca. Editado a mano, sin coste de LLM.
+- `tripo/viewer/creature.html` expone `window.creature` y un gancho `window.afterPose(t)` por frame.
+  La grabación mueve `jaw.rotation.x` con los visemas del audio.
+- Resultado (`.triage/decide/2b_kit.mp4`): la mandíbula acompaña al habla, pero se nota poco. Es
+  nivel marioneta. Para criaturas es la única vía; ver `docs/DECISIONES_TECNOLOGIA.md` en el repo
+  principal.

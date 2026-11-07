@@ -126,6 +126,8 @@ window.still = async (name, t = 0) => {
   return { bytes: blob.size };
 };
 
+// hooks for recording harnesses: the live creature, and a per-frame callback after the clip pose (e.g. a talking jaw)
+window.creature = { c, renderer, camera, scene, fit };
 window.ready = { ...c.stats, specBytes, clip: clipName };
 document.getElementById('hud').textContent = JSON.stringify(window.ready);
 const clock = new THREE.Clock();
@@ -134,6 +136,7 @@ renderer.setAnimationLoop(() => {
   if (!window.frozen) {
     const t = clock.elapsedTime;
     c.pose(clipName, t);
+    window.afterPose?.(t);
     for (const n of others) n.mixer?.update(dt);
   }
   renderer.render(scene, camera);
