@@ -117,6 +117,9 @@ class Settings(BaseSettings):
     # salta durante ORCH_TTS_COOLDOWN_S para no pagar su latencia en cada frase.
     ORCH_TTS_PROVIDERS: str = "elevenlabs,openai"
     ORCH_TTS_COOLDOWN_S: float = 120.0
+    # MuseTalk (lip-sync de la Etapa A en RunPod) pasa al laboratorio el 2026-11-07: apagado salvo que se
+    # active a mano, para que ninguna sesión encole trabajos en RunPod (sin workers se acumulaban en cola).
+    ORCH_MUSETALK_ENABLED: bool = False
     OPENAI_TTS_MODEL: str = "gpt-4o-mini-tts"
     OPENAI_TTS_VOICE: str = "coral"
 
