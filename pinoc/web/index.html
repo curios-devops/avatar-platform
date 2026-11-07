@@ -117,6 +117,53 @@ async function menus() {
   if (!$('char').options.length) fail('assets', 'no hay ningún personaje con vsplat listo (ni en la API ni en pinoc/assets/)');
 }
 
+// ── dark palms ──
+// PINOC fills what the source photo never showed (palms pressed to the thighs) with dark splats, which shows
+// as soon as a clip turns the hands. Splat colour is baked (no SH on characters), so the fix is a colour hook:
+// splats near each hand that are much darker than the forearm are pulled towards the forearm's own skin tone,
+// sampled from the frame. Hand anchors are taken at bind, in model space, the space of the hook's restCenter.
+// ?palmfix=0 turns it off. Vec3 uniforms did not reach the hook in 0.3.0, so the values go in as constants.
+function handAnchors(c) {
+  c.updateMatrixWorld();
+  const inv = c.matrixWorld.clone().invert();
+  const at = (n) => { const m = c.getBoneWorldMatrix(n); if (!m) return null; const e = m.data ?? m.elements; return new THREE.Vector3(e[12], e[13], e[14]).applyMatrix4(inv); };
+  const out = [];
+  for (const s of ['l', 'r']) {
+    const wrist = at(`hand_${s}`), knuckle = at(`middle_01_${s}`);
+    if (wrist && knuckle) out.push(wrist.lerp(knuckle, 0.8));
+  }
+  return out.length === 2 ? out : null;
+}
+function skinTone(c) {
+  renderer.render(scene, camera);
+  const cv = renderer.domElement, g = Object.assign(document.createElement('canvas'), { width: cv.width, height: cv.height }).getContext('2d', { willReadFrequently: true });
+  g.drawImage(cv, 0, 0);
+  const at = (n) => { const m = c.getBoneWorldMatrix(n); const e = m.data ?? m.elements; return new THREE.Vector3(e[12], e[13], e[14]); };
+  const px = [];
+  for (const s of ['l', 'r']) {
+    const p = at(`lowerarm_${s}`).lerp(at(`hand_${s}`), 0.6).project(camera);
+    const x = Math.round((p.x + 1) / 2 * cv.width), y = Math.round((1 - p.y) / 2 * cv.height), d = g.getImageData(x - 3, y - 3, 7, 7).data;
+    for (let i = 0; i < d.length; i += 4) px.push([d[i] / 255, d[i + 1] / 255, d[i + 2] / 255]);
+  }
+  const med = [0, 1, 2].map((k) => px.map((p) => p[k]).sort((a, b) => a - b)[px.length >> 1]);
+  const skinLike = med[0] > med[1] + 0.03 && med[1] > med[2] && med[0] > 0.35; // not a sleeve or the background
+  window.state.skinSample = med.map((v) => +v.toFixed(3));
+  return skinLike ? med : null;
+}
+async function fixPalms(c, anchors) {
+  await new Promise((r) => setTimeout(r, 600)); // the first frames draw before the splats are sorted
+  const skin = skinTone(c);
+  window.state.palmFix = skin ? { skin: skin.map((v) => +v.toFixed(3)) } : 'skipped (forearm is not skin)';
+  if (!skin) return;
+  const v3 = (v) => `vec3(${v.map((x) => x.toFixed(4)).join(', ')})`;
+  c.setColorModifier({ uniforms: {}, glsl: `void modifySplatColor(vec3 center, vec3 modelCenter, vec3 restCenter, uint splatIndex, inout vec4 color) {
+    const vec3 HL = ${v3(anchors[0].toArray())}; const vec3 HR = ${v3(anchors[1].toArray())}; const vec3 SKIN = ${v3(skin)};
+    float near = 1.0 - smoothstep(0.084, 0.14, min(distance(restCenter, HL), distance(restCenter, HR)));
+    float rel = dot(color.rgb, vec3(0.299, 0.587, 0.114)) / dot(SKIN, vec3(0.299, 0.587, 0.114));
+    color.rgb = mix(color.rgb, SKIN * mix(0.8, 1.0, clamp(rel, 0.0, 1.0)), near * smoothstep(0.8, 0.45, rel));
+  }` });
+}
+
 // ── load and play ──
 let character = null, clips = {}, yawDeg = 0, frames = 0, fps = 0, lastFps = performance.now();
 async function load() {
@@ -142,9 +189,12 @@ async function load() {
     };
     // the engine's default root pinning leaves PINOC characters facing -Z; turn them to the camera
     if (q.get('flip') !== '0') character.rotation.y = Math.PI;
+    character.update(0);
+    const anchors = q.get('palmfix') === '0' || backend !== 'webgl' ? null : handAnchors(character);
     character.play(clips.idle, { loop: true }); character.update(0);
     const headM = character.getBoneWorldMatrix('head'), headY = headM ? new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(headM.data ?? headM.elements)).y : 1.6;
     frameTo(headY + 0.15, +(q.get('zoom') ?? 1));
+    if (anchors) fixPalms(character, anchors);
     const splats = character.splats.reduce((a, s) => a + (s.numSplats ?? 0), 0);
     window.state = { ...window.state, stage: 'ready', loadMs: { character: Math.round(tChar), clips: Math.round(tClips) },
       bones: names.length, headBone: head, facialBones: names.filter((n) => n.startsWith('FACIAL_')).length, splats,

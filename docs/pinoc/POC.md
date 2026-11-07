@@ -230,11 +230,72 @@ Hoja: `.triage/pinoc/09_compare_opt2_vs_opt3.jpg`. Vídeo del híbrido: `.triage
 
 - **Reposo.** La opción 2 (splat puro) es la más realista.
 - **Hablar.** Solo la opción 3 articula, a costa del fotorrealismo de la cara.
-- **Siguiente prueba si se quiere fotorrealismo hablando.** La variante de vídeo de la opción 3:
-  splat para el cuerpo y el plano general, y el vídeo de Etapa A (Pruna Pro, unos 0,04 USD/s)
-  para los primeros planos con lip-sync. No se probó, por coste.
+- **Fotorrealismo hablando.** Lo da la variante 3b (abajo).
 
 **Gasto de la comparación.** 10 créditos de PINOC (quedan 44). El Twin es local y gratis. 0 USD.
+
+### Opción 3b: splat para el cuerpo + vídeo de Etapa A para el primer plano (2026-11-06)
+
+Hoja de caras: `.triage/pinoc/12_compare_2_3_3b.jpg`. Secuencia: `.triage/pinoc/opt3b_sequence.mp4`
+(tira: `11_opt3b_sequence_strip.jpg`). Script: `pinoc/opt3b_pruna.py`.
+
+- **Montaje.**
+  1. Se renderiza en `web/index.html` un primer plano 9:16 del propio personaje PINOC en idle
+     (`10_opt3b_portrait.jpeg`). Es el retrato que recibe Pruna, así que la identidad es la del splat.
+  2. La voz sale del TTS del backend: "Hola, soy Mei. Encantada de conocerte. ¿Empezamos?" (3,53 s).
+  3. Una sola llamada a `p-video-2-pro-avatar` a 768p: 18,6 s de reloj, 768×1344 a 24 fps.
+  4. La secuencia es: plano general del splat → acercamiento → corte seco al vídeo → corte seco de
+     vuelta al splat. Los cortes caen en los frames del splat cuyos 5 puntos faciales casan mejor
+     con el primer y el último frame de Pruna (error medio 2,2 px y 7,3 px).
+- **Medido**, con ArcFace contra el render del splat:
+
+  | | Identidad media (mín.) | Rango de boca |
+  |---|---|---|
+  | 3b Pruna | **0,835 (0,761)** | 0,26 |
+  | 3 híbrido Twin | −0,09: otra cara | 0,20 |
+
+  - Primer frame de Pruna frente al retrato: SSIM 0,95. Último frame: 0,88.
+  - Correlación boca/energía del audio: 0,31. Es el mejor valor medido hasta ahora, pero el proxy
+    sigue siendo débil.
+- **Lo que gana.**
+  - Fotorrealista al hablar: dientes, lengua, parpadeo y microgestos.
+  - Mantiene la cara del splat. Además limpia el borde moteado del pelo del splat.
+- **Lo que pierde.**
+  - No es tiempo real: unos 19 s por cada 3,5 s y sin streaming, así que solo sirve para frases
+    pregeneradas.
+  - 0,04 USD/s.
+  - Durante el vídeo la cámara queda fija: no se puede orbitar.
+  - En el corte de vuelta se nota un salto de textura: el vídeo sale algo más nítido y cálido que el
+    splat. Un fundido deja cara doble, por eso se usan cortes secos.
+- **Para pulirlo** (sin probar):
+  - Igualar el color y la nitidez del vídeo con el splat en el compositor.
+  - Pedir a Pruna medio segundo de silencio al principio y al final, para que el vídeo entre y salga
+    con la boca cerrada y en reposo.
+- **Veredicto.** Es la única opción con fotorrealismo hablando. Encaja en vídeos de redes y
+  saludos pregenerados. Para conversación en vivo sigue haciendo falta otra vía: el híbrido 3 o
+  MuseTalk.
+- **Gasto.** Pruna ~0,14 USD (3,53 s × 0,04). TTS < 0,01 USD. 0 créditos de PINOC.
+
+## Palmas oscuras (2026-11-07)
+
+- **Síntoma:** en cuerpo entero, cuando un clip gira las manos, las palmas de Mei se ven casi negras.
+  Las de Lucía, generada desde un render con las manos abiertas, salen bien.
+- **Causa:** PINOC rellena con splats oscuros lo que la foto no muestra (palmas pegadas a los
+  muslos). El color está horneado. Los `.vsplat` de personaje no llevan armónicos esféricos: el
+  motor solo lee `shDegree` en escenas SPZ. Así que no es la iluminación ni la rotación del color
+  con el hueso.
+- **Arreglo en `web/index.html`:**
+  - Un `setColorModifier` lleva hacia el tono de piel los splats que están cerca de cada mano
+    (en reposo, espacio `restCenter`) y son mucho más oscuros que el antebrazo.
+  - El tono se muestrea del propio fotograma, a mitad del antebrazo. Si no parece piel, por
+    ejemplo con manga larga, no se toca nada.
+  - Activo por defecto; `?palmfix=0` lo apaga.
+  - Evidencia: `.triage/decide/palm_fix_before_after.jpg`.
+- **Trampas del motor 0.3.0:**
+  - Los uniformes `vec3` no llegan al gancho, así que los valores van como constantes.
+  - `getBoneWorldMatrix` incluye la transformación del objeto.
+  - Con `update(0)` no se recalcula el color: para congelar una pose hay que usar un paso mínimo.
+- **Prevención:** generar desde fotos con las palmas visibles, o con varias fotos (de 1 a 5).
 
 ## Operaciones documentadas
 
