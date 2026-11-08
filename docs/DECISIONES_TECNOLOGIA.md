@@ -39,10 +39,11 @@ La sincronía boca/audio del 2A sube de 0,36 a 0,47 con el suavizado nuevo.
 
 | Tecnología | Dónde vive | Por qué está aquí | Cuándo revisarla |
 |---|---|---|---|
-| MuseTalk 1.5 (RunPod) | `worker/musetalk_worker`, apagado con `ORCH_MUSETALK_ENABLED=false` | RunPod sin saldo y 191 trabajos atascados en cola | Al reactivar RunPod: **purgar primero la cola** y repetir 1A y 2A con el mismo audio. No hay versión nueva (la 1.5 es la última; último commit 26-9-2025). La imagen ya incluye sus arreglos. |
+| MuseTalk 1.5 (RunPod) | `worker/musetalk_worker`, apagado con `ORCH_MUSETALK_ENABLED=false` | RunPod sin saldo y 191 trabajos atascados en cola | **2026-11-08:**<br>• La cola de la cuenta original ya está purgada (quedaban 28 trabajos) y esa cuenta se queda de respaldo.<br>• En la cuenta nueva (`RUNPOD_K_API_KEY`) está creado el endpoint `klnp0003oyai3e`: imagen w9, 0–1 workers, apagado a los 60 s.<br>• Su primer worker quedó en estado "unhealthy" y no llegó a ejecutar nada. Se limitó a CUDA 12.0–12.6, como el original; falta reintentar 1A y 2A.<br>• Gasto: 0,03 USD.<br><br>No hay versión nueva: la 1.5 es la última (último commit 26-9-2025). |
 | Híbrido cuerpo PINOC + cara Twin | `exp/pinoc-3dgs`, `pinoc/web/hybrid.html` | Habla en vivo, pero la cara se ve CG sobre un cuerpo foto | Si mejora la piel del Twin |
 | TripoSplat + esqueleto Anny | `exp/splat-human` | Identidad 0,30–0,35 y boca sin interior | Si sale un modelo de cabeza mejor |
-| SHARP (Apple), foto → 3DGS | `~/Documents/lab/sharp` (fuera de los repos) | **Pesos solo para investigación no comercial.** Estático, sin esqueleto, 66 MB por escena | Ver «SHARP» abajo |
+| SHARP (Apple), foto → 3DGS | `~/Documents/lab/sharp` (fuera de los repos) | **Pesos solo para investigación no comercial.** Estático, sin esqueleto, 66 MB por escena. Sustituido por la réplica propia (`splat/livephoto`) | Ver «SHARP» abajo |
+| PINOC / Viggle JST-2 | `exp/pinoc-3dgs` | Es el respaldo de 1B y 2B. El plan gratuito solo permite uso no comercial; el producto necesita plan de pago o la API (0,25 USD por personaje). Su biblioteca solo regala animaciones, no personajes | Antes de usarlo en el producto |
 | Vork | — (lista de vigilancia) | Renderizador CLI nativo (PNG/MP4), no corre en el navegador | Si publica una salida web/glTF |
 | EDGAR | — (lista de vigilancia) | Refina avatares gaussianos de cabeza que ya no usamos. Licencia no comercial, empeora la identidad, necesita GPU alquilada | Si vuelven las cabezas gaussianas |
 
@@ -68,6 +69,10 @@ Spark (World Labs) ya está en la última versión, 2.4.0. La copia en `splat/vi
   - suavizado de visemas con ataque de 35 ms y relajación de 60 ms;
   - el labio superior sube algo en a/e/i.
 - **Evidencia:** `.triage/decide/mouth_before_after.jpg` y `CMP_2A_habla_antes_despues.mp4`.
+- **Dientes (2026-11-08):** la textura de MakeHuman es un modelo dental, con esmalte gris amarillento, manchas oscuras y encía roja, y de cerca parecían dientes con caries.
+  - El shader los repinta de un blanco uniforme y conserva el 12 % del sombreado pintado.
+  - La encía se lleva a sombra y la penumbra con la boca casi cerrada se suaviza, así que una sonrisa se lee como una banda blanca.
+  - Evidencia: `.triage/decide/teeth_before_after.jpg`.
 
 ## SHARP: resultado y propuesta
 - **Prueba local en el M2 Pro (MPS):**
@@ -75,6 +80,22 @@ Spark (World Labs) ya está en la última versión, 2.4.0. La copia en `splat/vi
   - Fotorrealista entre ±20° y ±40° de giro. Se rompe a partir de unos 60°: a 90° es una lámina y aparecen manchas del fondo.
   - Evidencia: `.triage/decide/SHARP_portrait_yaw_0_20_40_60_90_-40.jpg`.
 - **Uso posible:** «fotos vivas» con paralaje (landing, tarjetas de personaje), no avatares. No se mueve y la licencia de los pesos impide usarlo en el producto.
-- **Replicar el principio sin copiarlo:**
-  - Ruta: profundidad monocular con una licencia comercial (por ejemplo Depth Anything V2 Small, Apache-2.0), retroproyectar cada píxel a una gaussiana orientada a la cámara, recortar el sujeto y comprimir a SPZ.
-  - Daría el mismo paralaje de ±20° con unos pocos MB, sin rellenar oclusiones. Pendiente de aprobación.
+- **Réplica propia, aprobada y hecha el 2026-11-08** (`exp/splat-human`, `splat/livephoto/make.py`):
+  - **Profundidad:** Depth Anything V2 Small (Apache-2.0).
+  - **Recorte:** umbral de Otsu sobre esa profundidad, limitado por la máscara de persona de DETR panoptic (Apache-2.0, nativo en `transformers`). BiRefNet (MIT) se descartó porque exige ejecutar código remoto.
+  - **Gaussianas:** una por píxel del sujeto, retroproyectada con cámara pinhole. Las de borde se alargan en profundidad, con tope, para que no se abran grietas al girar.
+  - **Salida:** `.splat` y SPZ v2 con codificador propio escrito a partir del formato público. Spark lo carga sin cambios.
+
+| | SHARP | Réplica propia |
+|---|---|---|
+| Tiempo por imagen (M2 Pro, en caliente) | 25–63 s | 2–3 s sin máscara de persona, ~35 s con ella |
+| Gaussianas | 1,18 M | 83–151 k |
+| Tamaño | 66 MB (PLY) | **0,43–0,73 MB (SPZ)**, 2,7–4,8 MB (.splat) |
+| ±20° | fotorrealista | fotorrealista, sujeto recortado y sin manchas de fondo |
+| ±40° | aguanta | aguanta la cara; aparecen puntos sueltos en la silueta |
+| ≥60° | se rompe | se rompe: los laterales quedan vacíos, porque no hay relleno de oclusiones |
+| Licencia | no comercial | Apache-2.0 / MIT, válida para el producto |
+
+- **Evidencia:** `.triage/decide/LIVEPHOTO_portrait_yaw_0_20_40_60_90_-40.jpg` y `LIVEPHOTO_mei_yaw_0_20_40_60_90_-40.jpg`, junto a la hoja de SHARP.
+- **Uso:** fotos vivas con giro de ±20° (landing, tarjetas de personaje). No sirve para el avatar.
+- **Pendiente:** un segmentador fino con licencia comercial y sin código remoto quitaría los puntos sueltos de la silueta y el resto de suelo bajo los pies.
