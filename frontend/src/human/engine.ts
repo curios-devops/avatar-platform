@@ -79,10 +79,14 @@ void main() {`)
  * Mouth interior: teeth and tongue were lit like the face, so an open mouth read as a bright pink box with no
  * depth. Light dies quickly behind the lips: each fragment is darkened by its depth behind the front incisors,
  * and more when the jaw is nearly shut (less light gets in). The uniforms follow the head bone every frame.
+ * The MakeHuman teeth texture is a dental model (grey-yellow enamel, dark stains, red gums), which read as decayed
+ * teeth up close: teeth are repainted a clean even white (a little of the painted shading kept) and the gums are
+ * pushed into the shadow, so a smile reads as one white band.
  */
 type MouthUniforms = { uMouthFront: { value: THREE.Vector3 }; uMouthFwd: { value: THREE.Vector3 }; uMouthOpen: { value: number } };
 function mouthShader(m: THREE.MeshPhysicalMaterial, kind: 'teeth' | 'tongue', u: MouthUniforms) {
   const floor = kind === 'teeth' ? '0.3' : '0.14';
+  const shut = kind === 'teeth' ? '0.8' : '0.55';
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader
@@ -91,8 +95,13 @@ function mouthShader(m: THREE.MeshPhysicalMaterial, kind: 'teeth' | 'tongue', u:
     sh.fragmentShader = sh.fragmentShader
       .replace('void main() {', 'uniform vec3 uMouthFront;\nuniform vec3 uMouthFwd;\nuniform float uMouthOpen;\nvarying vec3 vMouthWorld;\nvoid main() {')
       .replace('#include <opaque_fragment>', `float mouthDepth = max(0.0, dot(uMouthFront - vMouthWorld, uMouthFwd));
-  outgoingLight *= mix(${floor}, 1.0, exp(-mouthDepth / 0.009)) * mix(0.55, 1.0, uMouthOpen);
+  outgoingLight *= mix(${floor}, 1.0, exp(-mouthDepth / 0.009)) * mix(${shut}, 1.0, uMouthOpen);
   #include <opaque_fragment>`);
+    if (kind === 'teeth') sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+  float gum = smoothstep(0.08, 0.25, diffuseColor.r - max(diffuseColor.g, diffuseColor.b));
+  float enamel = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+  vec3 white = vec3(0.95, 0.94, 0.91) * mix(1.0, enamel / 0.75, 0.12);
+  diffuseColor.rgb = mix(white, vec3(0.16, 0.05, 0.05), gum);`);
   };
   m.customProgramCacheKey = () => `mouth-${kind}`;
 }
