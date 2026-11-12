@@ -1,0 +1,7 @@
+# Media stays local (and in R2 when needed): the repo is public and these are heavy.
+*.mp4
+*.wav
+*.png
+*.jpg
+*.webm
+*.pcm

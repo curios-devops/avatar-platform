@@ -1,0 +1,55 @@
+{
+  "imani": {
+    "voice": {
+      "seconds": 2.2,
+      "audio_s": 13.04,
+      "characters": 199
+    }
+  },
+  "nueva": {
+    "portrait": {
+      "seconds": 18.0,
+      "usage": {
+        "input_tokens": 1102,
+        "input_tokens_details": {
+          "image_tokens": 1024,
+          "text_tokens": 78
+        },
+        "output_tokens": 439,
+        "output_tokens_details": {
+          "image_tokens": 439,
+          "text_tokens": 0
+        },
+        "total_tokens": 1541
+      }
+    },
+    "voice": {
+      "seconds": 10.3,
+      "audio_s": 10.08,
+      "characters": 163
+    }
+  },
+  "noa": {
+    "portrait": {
+      "seconds": 16.1,
+      "usage": {
+        "input_tokens": 130,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 130
+        },
+        "output_tokens": 439,
+        "output_tokens_details": {
+          "image_tokens": 439,
+          "text_tokens": 0
+        },
+        "total_tokens": 569
+      }
+    },
+    "voice": {
+      "seconds": 11.9,
+      "audio_s": 12.88,
+      "characters": 196
+    }
+  }
+}
