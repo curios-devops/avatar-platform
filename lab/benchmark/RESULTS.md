@@ -1,3 +1,41 @@
+# Avatar benchmark V2: real-time calls (2026-11-12, night)
+
+Only live calls, no pre-rendered video. The full MEYA flow: a new companion, **Lexi**, created the MEYA way (described →
+drawn by the runtime's image model, half-body) → animated by each engine → a guest opens her profile, taps
+*Videollamada*, and talks to her through the ElevenLabs agent. A simulated person (a WAV as the microphone) answers,
+waits, asks for music and **interrupts her mid-answer**. Both engines on **one RTX A5000 (24 GB, 0.27 USD/h)**, the
+cheapest card that held real time for both; same call, same agent, same voice.
+
+| | MuseTalk 1.5 (LiveTalking) | FlashHead Lite (our `lab/flashhead/fh_server.py`, engine after Mynah) |
+|---|---|---|
+| Input it needs | a short video of her (Pruna, 24 s, ~0.16 USD) + avatar build ~3 min | **the photo only** |
+| Speed on the A5000 | real time, 25 fps | **1.8× real time** (0.53 s per 0.96 s chunk) |
+| Turn end → first lip-synced frame | ~0.94 s (audio → first sound, V1) | **0.83–0.85 s** (measured in the call) |
+| Barge-in | works | works |
+| Calls per GPU | ~2 | 1 |
+| VRAM | ~7.7 GB | 5.8 GB |
+| Start-up of the server | ~2.8 min from the image | load 36 s + warm-up/idle loop 3 min (once per pod) |
+| Identity vs her portrait (ArcFace) | 0.56 (the generated clip drifts) | **0.89** |
+| Head/body motion | **high** (the clip's own motion) | low: only the head moves, the body is a still canvas |
+| Mouth | moves, mostly closed | **clear articulation** (teeth, syllables) |
+| Sharpness (face) | **67** | 48 |
+| GPU per minute of call | ~0.002 USD | ~0.0045 USD |
+
+Recordings: `scratchpad/live/lexi_{musetalk,flashhead}_call.webm` (both sides of the call), cut to 30 s in
+`results/rt-{musetalk,flashhead}_lexi.mp4`.
+
+**Reading.** FlashHead is the better *face* for a being made from a photo: it is her, and she articulates. MuseTalk is
+the better *presence*: the body moves, but only as well as the clip we feed it, and the clip drifts from her identity.
+The gap is the body: Mynah's answer is the same as what we see in Atmee (pre-made idle/gesture clips of the half-body
+canvas, played while she listens and between turns, with the live head on top).
+
+**Recommendation V2.** Primary for live calls: **FlashHead Lite** for beings created from a photo (no prep, true to the
+portrait), with a half-body idle/gesture layer as the next step. Secondary: **MuseTalk** (cheaper per call, more body
+motion, and the fallback when FlashHead's LTX VAE licence or capacity is a problem). Cheapest card that does both in
+real time: **RTX 3090 / A5000 class (~0.22–0.27 USD/h)**; a 16 GB A4000 is unlikely to hold FlashHead above 1×.
+
+---
+
 # Avatar benchmark V1 (2026-11-12)
 
 Same portrait, same voice, same line (~13 s) for every engine. Two cases: **Imani** (one of our beings, film

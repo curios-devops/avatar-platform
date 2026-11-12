@@ -115,5 +115,31 @@
     "sharpness": 234.6,
     "motion_pct": 8.24,
     "faces": 1.0
+  },
+  "rt-musetalk_lexi": {
+    "case": "lexi",
+    "resolution": "768x1152",
+    "fps": 25.0,
+    "seconds": 30.04,
+    "identity_mean": 0.562,
+    "identity_p10": 0.447,
+    "lipsync_corr": 0.09,
+    "lipsync_lag_ms": -200,
+    "sharpness": 67.4,
+    "motion_pct": 14.84,
+    "faces": 1.0
+  },
+  "rt-flashhead_lexi": {
+    "case": "lexi",
+    "resolution": "720x1280",
+    "fps": 25.0,
+    "seconds": 30.08,
+    "identity_mean": 0.894,
+    "identity_p10": 0.815,
+    "lipsync_corr": 0.142,
+    "lipsync_lag_ms": -40,
+    "sharpness": 48.0,
+    "motion_pct": 1.69,
+    "faces": 1.0
   }
 }
