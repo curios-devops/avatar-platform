@@ -57,7 +57,7 @@ def portrait_from_upload(case: dict, dst: pathlib.Path) -> dict:
     square(case["upload"], up)
     with httpx.Client(timeout=240) as c:
         r = c.post("https://api.openai.com/v1/images/edits", headers={"Authorization": f"Bearer {key('OPENAI_API_KEY')}"},
-                   data={"model": "gpt-image-2.5-sunburst", "prompt": case["prompt"], "size": "1024x1024", "quality": "medium", "n": "1"},
+                   data={"model": "gpt-image-2.6-sunburst", "prompt": case["prompt"], "size": "1024x1024", "quality": "medium", "n": "1"},
                    files={"image[]": (up.name, up.read_bytes(), "image/png")})
         if r.is_error:
             raise RuntimeError(f"images/edits HTTP {r.status_code}: {r.text[:300]}")
@@ -73,7 +73,7 @@ def portrait_from_text(case: dict, dst: pathlib.Path) -> dict:
     import base64
     t0 = time.time()
     r = httpx.post("https://api.openai.com/v1/images/generations", headers={"Authorization": f"Bearer {key('OPENAI_API_KEY')}"}, timeout=240,
-                   json={"model": "gpt-image-2.5-sunburst", "prompt": case["generate"], "size": "1024x1024", "quality": "medium", "n": 1})
+                   json={"model": "gpt-image-2.6-sunburst", "prompt": case["generate"], "size": "1024x1024", "quality": "medium", "n": 1})
     if r.is_error:
         raise RuntimeError(f"images/generations HTTP {r.status_code}: {r.text[:300]}")
     d = r.json()

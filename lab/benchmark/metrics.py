@@ -7,6 +7,8 @@
   sharpness  variance of the Laplacian on the face crop resized to 256 px (higher = more detail; compare, don't trust
              in absolute).
   motion     how alive the head is: std of the nose tip, in % of the face width.
+  body       how alive the rest is (torso, shoulders, hands): mean absolute change between frames 0.2 s apart in the
+             frame below the face, grey levels 0-255 (0 = a still picture; the face's own motion is excluded).
   faces      share of sampled frames where a face was found.
 
     backend/.venv/bin/python lab/benchmark/metrics.py lab/benchmark/results/*.mp4  ->  results/metrics.json
@@ -76,11 +78,13 @@ def measure(app, video: pathlib.Path) -> dict:
     h, w = frames[0].shape[:2]
     sims, sharp, noses, found = [], [], [], 0
     openness = np.full(len(frames), np.nan)
+    chin = None
     for i, f in enumerate(frames):
         face = biggest(app, f)
         if face is None:
             continue
         box = face.bbox.astype(int)
+        chin = chin or int(box[3] + 0.1 * (box[3] - box[1]))
         face_h, face_w = max(1, box[3] - box[1]), max(1, box[2] - box[0])
         mouth = face.landmark_2d_106[52:72]
         openness[i] = (mouth[:, 1].max() - mouth[:, 1].min()) / face_h
@@ -91,6 +95,12 @@ def measure(app, video: pathlib.Path) -> dict:
             x0, y0, x1, y1 = np.clip(box, 0, [w, h, w, h])
             crop = cv2.cvtColor(cv2.resize(f[y0:y1, x0:x1], (256, 256)), cv2.COLOR_BGR2GRAY)
             sharp.append(cv2.Laplacian(crop, cv2.CV_64F).var())
+    body = []
+    for i in range(5, len(frames), 5):  # below the chin of the first face found, to the bottom of the frame
+        y = int(min(h - 2, (chin or h * 0.45)))
+        a = cv2.cvtColor(cv2.resize(frames[i - 5][y:], (160, 160)), cv2.COLOR_BGR2GRAY).astype(np.float32)
+        b = cv2.cvtColor(cv2.resize(frames[i][y:], (160, 160)), cv2.COLOR_BGR2GRAY).astype(np.float32)
+        body.append(float(np.abs(a - b).mean()))
     rms = audio_rms(video, fps, len(frames))
     corr, lag_ms = lipsync(openness, rms, fps)
     noses = np.array(noses) if noses else np.zeros((1, 2))
@@ -101,6 +111,7 @@ def measure(app, video: pathlib.Path) -> dict:
         "lipsync_corr": corr, "lipsync_lag_ms": lag_ms,
         "sharpness": round(float(np.median(sharp)), 1) if sharp else None,
         "motion_pct": round(float(np.std(noses, axis=0).mean() * 100), 2),
+        "body_motion": round(float(np.mean(body)), 2) if body else None,
         "faces": round(found / max(1, len(range(0, len(frames), 5))), 2),
     }
 

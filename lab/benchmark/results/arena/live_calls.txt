@@ -1,0 +1,14 @@
+Arena V3, 2026-11-13. Live calls through the MEYA web (guest, Ada's profile -> Videollamada), fake mic: lab ada_user.wav
+(two questions, then "Espera, espera. Dímelo en una sola frase." mid-answer). ElevenLabs agent, Ada's voice (Valeria).
+
+MuseTalk 1.5 (LiveTalking, devopsavatar/meya-livetalking) on the gesture clip, RTX A5000 secure 0.27 USD/h
+  avatar built from the 10 s clip at boot in 3 min (first pod), then from R2 in 6 s; WebRTC connected; greeting, 2 answers,
+  barge-in honoured, guest minute ended with the sign-up invite.
+  (first try on an RTX 3090 community host: ICE never connected, the host drops UDP; pod replaced)
+
+FlashHead Lite + gesture layer (lab/flashhead/fh_server.py --body), same A5000
+  body loop: 251 frames (10 s, ping-pong 20 s), face tracked in all, scale 0.93-1.01, tilt -12..36 deg; composite 8-12 ms/frame
+  engine load 40.5 s, warm-up + idle loop 174 s
+  chunks 0.52-0.68 s per 0.96 s of audio (1.4-1.8x real time)
+  LATENCY user transcript -> first lip-synced frame: 0.81 s, 0.86 s, 0.93 s
+  tape of her side of the call: 66.3 s (input for the rendered engines)

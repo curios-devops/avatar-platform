@@ -91,8 +91,12 @@ def watchdog(pid):
         try:
             if time.time() - started > MAX_MINUTES * 60:
                 terminate(pid); print("tiempo máximo alcanzado"); return
-            spent = b0 - balance()["clientBalance"]
-            (HERE / "spent.txt").write_text(f"{time.strftime('%H:%M:%S')} {spent:.4f}\n")
+            # this pod's own cost (its rate x the time it has existed), not the account's: on 2026-11-13 an
+            # account-wide count let a second pod's spend trip this one's cap
+            s0, p0 = req(f"https://rest.runpod.io/v1/pods/{pid}")
+            rate = float(p0.get("costPerHr") or 0) if isinstance(p0, dict) else 0.0
+            spent = rate * (time.time() - started) / 3600
+            (HERE / f"spent_{pid}.txt").write_text(f"{time.strftime('%H:%M:%S')} {spent:.4f} (account {b0 - balance()['clientBalance']:.4f})\n")
             if spent >= CAP:
                 terminate(pid); print("CAP alcanzado", spent); return
             s, p = req(f"https://rest.runpod.io/v1/pods/{pid}")

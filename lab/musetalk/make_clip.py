@@ -13,8 +13,8 @@ OUT = pathlib.Path(sys.argv[2])
 ENV = dict(l.split("=", 1) for l in pathlib.Path("/Users/mac/Documents/avatar-platform/backend/.env").read_text().splitlines()
            if "=" in l and not l.lstrip().startswith("#"))
 KEY = ENV["PRUNA_K_API_KEY"].strip().strip('"')
-SECONDS = 8
-PROMPT = ("Static locked-off camera, no zoom, no cut, the background stays the same, sharp focus on her face. The "
+SECONDS = int(__import__("os").environ.get("CLIP_SECONDS", 8))
+PROMPT = __import__("os").environ.get("CLIP_PROMPT") or ("Static locked-off camera, no zoom, no cut, the background stays the same, sharp focus on her face. The "
           "same woman is on a calm, friendly video call: she looks straight into the "
           "lens the whole time with attentive, kind eyes and a gentle closed-lip smile. She listens and gives slow, "
           "reassuring nods, tilts her head slightly, blinks naturally and breathes calmly. Her head stays centred, her "
