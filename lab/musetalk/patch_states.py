@@ -68,3 +68,37 @@ if "segment_for" not in s:
     p.write_text(s)
 print("patched", all(x in Path(f).read_text() for x, f in (("seg_index", "avatars/base_avatar.py"), ("seg_index", "avatars/musetalk_avatar.py"),
                                                            ("MEYA_CUSTOM_CONFIG", "app.py"), ("segment_for", "el_bridge.py"))))
+
+# ---------------------------------------------------------------- round 3: a clip per sentence, greeting on the first turn
+# MEYA_SEGMENTS may now also name "greet" (the avatar video = greet + explain + emphasis clips). The bridge splits each
+# answer into sentences and switches avatar.body_segment when the being reaches each one (timers from the answer's
+# arrival, at the voice's pace), every clip at least 2 s. Same rules as lab/flashhead/body_layer.py plan_for.
+p = Path("el_bridge.py"); s = p.read_text()
+if "plan_for" not in s:
+    s = s.replace("def segment_for(text: str) -> str:", "def segment_for(text: str, need: int = 2) -> str:", 1)
+    s = s.replace("    return 'emphasis' if hits >= 2 else 'explain'\n", "    return 'emphasis' if hits >= need else 'explain'\n\n\n"
+                  "def plan_for(text: str, first_turn: bool = False):\n"
+                  "    \"\"\"[(seconds into the answer, clip)]: greeting first on the call's first turn, then a clip per sentence.\"\"\"\n"
+                  "    plan, t = [], 0.0\n"
+                  "    for k, sent in enumerate(x for x in _re.split(r'(?<=[.!?])\\s+', text.strip()) if x):\n"
+                  "        clip = 'greet' if first_turn and k == 0 else segment_for(sent, need=1)\n"
+                  "        if not plan or (clip != plan[-1][1] and t - plan[-1][0] >= 2.0):\n"
+                  "            plan.append((t, clip))\n"
+                  "        t += len(sent) / 14.5\n"
+                  "    return plan\n", 1)
+    old = ('            self.avatar.body_segment = segment_for(text)\n'
+           '            logger.info(f"bridge: body {self.avatar.body_segment} for: {text[:60]}")\n')
+    assert old in s
+    s = s.replace(old, '            import threading as _th\n'
+                       '            segs = getattr(self.avatar, "body_segments", None) or {}\n'
+                       '            plan = [(t, c) for t, c in plan_for(text, not getattr(self, "_answered", False)) if c in segs]\n'
+                       '            self._answered = True\n'
+                       '            for _t in getattr(self, "_plan_timers", []):\n'
+                       '                _t.cancel()\n'
+                       '            self._plan_timers = []\n'
+                       '            for t, c in plan:\n'
+                       '                tm = _th.Timer(t, lambda c=c: setattr(self.avatar, "body_segment", c)); tm.daemon = True; tm.start()\n'
+                       '                self._plan_timers.append(tm)\n'
+                       '            logger.info(f"bridge: body plan {plan} for: {text[:60]}")\n', 1)
+    p.write_text(s)
+    print("round 3 bridge patched")

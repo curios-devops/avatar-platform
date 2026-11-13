@@ -20,3 +20,5 @@ interface); one that loses is either removed or kept here, marked experimental.
 
 Rules: every GPU pod has a watchdog that survives network errors and its own self-stop; it is terminated when the
 work is done (see the root `CLAUDE.md`). Media stays out of git (`.gitignore`).
+| `flashhead/body_layer.py`, `fh_dump.py`, `compose_offline.py` | Round 3: the gesture layer on its own (clips per moment, a clip per sentence, v3 anchoring on eyes, nose and mouth with soft edges), FlashHead raw frames dumped on a pod, and offline compositing on a laptop to measure and see the ghost. |
+| `musetalk/make_round3_clips.py` | Round 3 clips: greet / explain / emphasis from Jin's voice (Pruna p-video-2-pro-avatar) and listen / think (p-video-2-pro-reference), 480p. |

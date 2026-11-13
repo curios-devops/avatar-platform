@@ -1,0 +1,2 @@
+{"file": "jin3_125450_417.png", "seconds": 25.7, "usage": {"input_tokens": 760, "input_tokens_details": {"image_tokens": 512, "text_tokens": 248}, "output_tokens": 1132, "output_tokens_details": {"image_tokens": 1132, "text_tokens": 0}, "total_tokens": 1892}}
+{"file": "jin3_125451_125.png", "seconds": 26.7, "usage": {"input_tokens": 760, "input_tokens_details": {"image_tokens": 512, "text_tokens": 248}, "output_tokens": 1132, "output_tokens_details": {"image_tokens": 1132, "text_tokens": 0}, "total_tokens": 1892}}

@@ -1,3 +1,60 @@
+# Round 3 — Jin's new look, speaking clips, a clip per sentence, tighter FlashHead anchoring (2026-11-13, midday)
+
+**Jin, new look.** Closer to the tech-creator reference: navy t-shirt with the MEYA mark, thin black glasses, blue-lit
+tech studio, smartwatch. `gpt-image-2.6-sunburst` image edit with our logo as the only input image (2 drafts, ~0.075 USD;
+`inputs/round3/jin/gen.py`). Voice: ElevenLabs "Brian - Social Media" (`U9TSK9KHMlMU2qkeXlQP`, young, casual, neutral
+Latin American Spanish); no Spanish voice with an East Asian accent exists in the library. `digital-humans/jin.json` updated.
+
+**Five body clips per being** (`lab/musetalk/make_round3_clips.py`, all from the portrait's pose, 480p):
+
+| Clip | Model | How | Length |
+|---|---|---|---|
+| greet | p-video-2-pro-avatar | a line in Jin's voice -> waves, smiles | 4.4 s |
+| explain | p-video-2-pro-avatar | a line in Jin's voice -> open-hand gestures on the rhythm of speech | 6.8 s |
+| emphasis | p-video-2-pro-avatar | "tres cosas: primero..." -> counts on his fingers | 7.0 s |
+| listen | p-video-2-pro-reference | lips closed, nods, breathing | 5.2 s |
+| think | p-video-2-pro-reference | looks aside, taps his chin, nods | 5.2 s |
+
+The speaking clips come from real speech, so the gestures follow a voice; the live engine repaints the mouth.
+
+**A clip per sentence** (`body_layer.plan_for`, and the same rules in the MuseTalk bridge, `patch_states.py` round 3):
+- The call's first sentence uses *greet*.
+- Each sentence with a list word or "ojo" uses *emphasis*; the others use *explain*.
+- Every clip plays at least 2 s.
+- *think* fills the gap between the person's last word and the first audio of the answer (FlashHead).
+
+Example: "Buena pregunta... / tres cosas: primero... / Al final, vale la pena" -> explain, emphasis, explain.
+
+**FlashHead anchoring v3** (`lab/flashhead/body_layer.py`, offline test on real FlashHead frames, `fh_dump.py` +
+`compose_offline.py`):
+- **Registration.** v3 tracks 11 anchors frame by frame (eye corners, nose, mouth corners) and fits them by weighted least squares (a similarity plus half an affine), so the eyes and the mouth both land. v2 matched the eyes only.
+- **No lag.** The clip track is smoothed over 3 frames with zero phase, and FlashHead's track with a One Euro filter. v2 used 7 frames plus an exponential average, which trailed quick nods.
+- **Soft edges.** Alpha fades with the distance to the face outline, so the face is transparent towards the borders. The mask and the colour match are smoothed over time, so the seam does not change from one frame to the next.
+- **Both faces.** The face is pasted only where both faces are, FlashHead's and the clip's. FlashHead skin never lands on the clip's background or hair, which caused the double jaw line.
+
+| 22 s of Jin's voice, 5 clips | v2 (round 2) | v3 |
+|---|---|---|
+| anchor error, mean / p95 (px, 720×1280) | 1.91 / 3.49 | **1.71 / 3.17** |
+| face pasted outside the clip's face, mean / p95 | 2.4 % / 4.0 % | **0 %** (0.7 % / 2.1 % before the intersection) |
+
+In v2 a light band shows outside the jaw on both sides; v3 has a clean jaw line (`results/round3/fh/worst_frames_v2_vs_v3.jpg`).
+FlashHead Lite on an RTX 3090 (community, 0.22 USD/h) runs at 0.55 s per 0.96 s chunk (1.75× real time), so a 3090 is
+enough for a live call.
+
+**Cost:** about 0.6–0.75 USD in all.
+- Pruna, 480p: about 0.5–0.65 USD.
+- Images: 0.075 USD.
+- RunPod: 0.04 USD.
+
+At the end both RunPod accounts were at 0 pods and 0 USD/h.
+
+**Pending live test:**
+- one call per engine with the new clips;
+- for MuseTalk, building Jin's avatar from greet + explain + emphasis (`MEYA_SEGMENTS` with `greet`);
+- for MuseTalk, *think* still needs a second silent video in LiveTalking.
+
+Files: `results/round3/fh/compose_v2_vs_v3.mp4` (side by side, with audio), `compose_v3.mp4`, `clips_*.jpg`.
+
 # Round 2 — body states and a wider arena (2026-11-13, morning)
 
 **The being.** **Jin**, a tech creator (male, East Asian, original), made the MEYA way: described → drawn by

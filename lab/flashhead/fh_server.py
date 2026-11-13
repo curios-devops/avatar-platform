@@ -4,7 +4,7 @@ Speaks the same protocol as our LiveTalking server, so the web needs no change (
   POST /offer {sdp, type, avatar, agent:{signedUrl, firstMessage, language, variables}} -> {sdp, type}
   data channel "meya": {type: agent|user|correction|mode|interruption|ready|ended}
 
-Pipeline: browser mic -> 16 kHz -> ElevenLabs agent (signed URL, so no key here) -> agent audio -> FlashHead (24 frames
+Pipeline (gesture layer in body_layer.py): browser mic -> 16 kHz -> ElevenLabs agent (signed URL, so no key here) -> agent audio -> FlashHead (24 frames
 per 0.96 s chunk, streaming, stateful) -> the 512 px face pasted back onto the being's half-body canvas (720x1280) ->
 WebRTC video + the same audio slice, on one 25 fps clock. Silence plays an idle loop generated at boot, so the GPU only
 works while the being talks and an answer never waits behind silent chunks. Interruption drops everything queued.
@@ -77,183 +77,9 @@ class Compositor:
         return out
 
 
-def eyes(det, bgr, with_mesh=False):
-    """Face Mesh on a BGR image -> (eye midpoint x, y, eye distance, eye-line angle) from the four eye corners, and the
-    478 landmarks in pixels when asked. Same detector for the clip and for FlashHead, so both are measured alike."""
-    r = det.process(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
-    if not r.multi_face_landmarks:
-        return (None, None) if with_mesh else None
-    H, W = bgr.shape[:2]
-    pts = np.array([(l.x * W, l.y * H) for l in r.multi_face_landmarks[0].landmark], np.float32)
-    a, b = (pts[33] + pts[133]) / 2, (pts[362] + pts[263]) / 2  # the person's right eye, left eye
-    t = np.array([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, float(np.hypot(*(b - a))), np.arctan2(b[1] - a[1], b[0] - a[0])], np.float32)
-    return (t, pts) if with_mesh else t
-
-
-def face_mesh(static=False):
-    import mediapipe as mp
-    return mp.solutions.face_mesh.FaceMesh(static_image_mode=static, max_num_faces=1, refine_landmarks=False,
-                                           min_detection_confidence=0.3, min_tracking_confidence=0.3)
-
-
-OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150,
-        136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
-
-
-def face_mask(pts, t, shape):
-    """FlashHead's own face outline (Face Mesh oval), cut a little above the brows (its hair never pastes over the
-    clip's), shrunk and feathered inwards so the seam lies on skin, not on brows, eyes or jaw."""
-    m = np.zeros(shape[:2], np.float32)
-    cv2.fillPoly(m, [pts[OVAL].astype(np.int32)], 1.0)
-    d, ang = t[2], t[3]
-    n = np.array([np.sin(ang), -np.cos(ang)], np.float32)  # "up" in the face's own frame
-    ys, xs = np.mgrid[0:shape[0], 0:shape[1]].astype(np.float32)
-    up = (xs - t[0]) * n[0] + (ys - t[1]) * n[1]  # distance above the eye line
-    m *= np.clip((0.75 * d - up) / (0.25 * d), 0, 1)
-    k = int(d * 0.35) | 1
-    m = cv2.erode(m, np.ones((max(3, int(d * 0.12)),) * 2, np.uint8))
-    return cv2.GaussianBlur(m, (k, k), d * 0.12)
-
-
-def sim(t):
-    """2x2 similarity (scale = eye distance, rotation = eye-line angle) of an eye track."""
-    return t[2] * np.array([[np.cos(t[3]), -np.sin(t[3])], [np.sin(t[3]), np.cos(t[3])]], np.float32)
-
-
-class BodyClips:
-    """Gesture layer, round 2. Pre-made half-body clips of the being, one per moment of the call (listen, explain,
-    emphasis; lips closed), play under the live face: 'listen' while she is silent (after 0.6 s of silence, so a
-    breath between sentences does not flip it), the turn's clip while she talks (picked from the answer's text), with
-    a short cross-fade at every switch. Each clip restarts from its first frame, and all start from the portrait's pose.
-
-    Registration (the round 1 'ghost' fix): round 1 placed FlashHead's face by where the *portrait's* eyes were, but
-    FlashHead moves its own head inside its crop, so the pasted face slid over the clip's head. Now both sides are
-    tracked: the clip's eyes per frame (offline, smoothed) and FlashHead's eyes per generated frame (live, lightly
-    smoothed), and the face is warped eye-to-eye (scale, tilt, shift) before the soft inner-face blend.
-    """
-
-    def __init__(self, clips, smooth=7, fade=6, hold=15):
-        self.det, self.det_fh = None, face_mesh()
-        self.clips, self.fade_n, self.hold = {}, fade, hold
-        for name, path in clips.items():
-            self.det = face_mesh()
-            cap, frames = cv2.VideoCapture(path), []
-            src_fps = cap.get(cv2.CAP_PROP_FPS) or FPS
-            while True:
-                ok, f = cap.read()
-                if not ok:
-                    break
-                frames.append(BodyClips._fit(f))
-            idx = np.round(np.arange(0, len(frames), src_fps / FPS)).astype(int)
-            frames = [frames[min(i, len(frames) - 1)] for i in idx]
-            tracks, missed = [], 0
-            for f in frames:
-                t = eyes(self.det, f)
-                if t is None:
-                    missed += 1; t = tracks[-1] if tracks else np.array([CANVAS_W / 2, CANVAS_H / 4, 60, 0], np.float32)
-                tracks.append(t)
-            t = np.array(tracks, np.float32); t[:, 3] = np.unwrap(t[:, 3])
-            k = np.ones(smooth, np.float32) / smooth
-            t = np.stack([np.convolve(np.pad(t[:, j], smooth // 2, mode="edge"), k, mode="valid") for j in range(4)], 1)
-            self.clips[name] = (frames, t)
-            log(f"body clip {name}: {len(frames)} frames ({len(frames) / FPS:.1f}s), eyes missed in {missed}, "
-                f"tilt {np.degrees(t[:, 3].min()):.0f}..{np.degrees(t[:, 3].max()):.0f} deg")
-        self.state = "listen" if "listen" in self.clips else next(iter(self.clips))
-        self.turn = "explain" if "explain" in self.clips else self.state
-        self.n, self.fade, self.prev, self.silent, self.fh = 0, 0, None, 0, None
-
-    @staticmethod
-    def _fit(bgr):
-        h, w = bgr.shape[:2]
-        tw = min(w, int(h * 9 / 16))
-        crop = bgr[:, (w - tw) // 2:(w - tw) // 2 + tw]
-        crop = cv2.resize(crop, (CANVAS_W, int(h * CANVAS_W / tw)), interpolation=cv2.INTER_AREA)
-        out = np.full((CANVAS_H, CANVAS_W, 3), 250, np.uint8)
-        out[:min(CANVAS_H, crop.shape[0])] = crop[:CANVAS_H]
-        return out
-
-    def _switch(self, state):
-        if state != self.state and state in self.clips:
-            log(f"body {self.state} -> {state}")
-            self.state, self.n, self.fade = state, 0, self.fade_n
-
-    def set_turn(self, state):
-        """The answer's text chose a clip. Early in the turn it takes over at once; later it waits for the next turn."""
-        if state in self.clips:
-            self.turn = state
-            if self.state != "listen" and self.n < FPS:
-                self._switch(state)
-
-    def __call__(self, face_rgb, n, talking=None):
-        # state machine
-        if talking:
-            self.silent = 0
-            if self.state == "listen":
-                self._switch(self.turn)
-        elif talking is not None:
-            self.silent += 1
-            if self.silent >= self.hold:
-                self._switch("listen" if "listen" in self.clips else self.state)
-        frames, track = self.clips[self.state]
-        i = mirror(len(frames), self.n); self.n += 1
-        out = frames[i].copy()
-        if face_rgb is not None:
-            out = self._paste(out, face_rgb, track[i])
-        if self.fade > 0 and self.prev is not None:
-            a = self.fade / (self.fade_n + 1)
-            out = cv2.addWeighted(self.prev, a, out, 1 - a, 0); self.fade -= 1
-        self.prev = out
-        return out
-
-    def _paste(self, out, face_rgb, tc):
-        face = cv2.cvtColor(face_rgb, cv2.COLOR_RGB2BGR)
-        tf, pts = eyes(self.det_fh, face, with_mesh=True)
-        if tf is not None:
-            if self.fh is not None:  # light smoothing of FlashHead's own track (its head moves, its detector jitters)
-                tf[3] = self.fh[3] + np.arctan2(np.sin(tf[3] - self.fh[3]), np.cos(tf[3] - self.fh[3]))
-                tf = 0.6 * tf + 0.4 * self.fh
-                pts = 0.6 * pts + 0.4 * self.pts
-            self.fh, self.pts = tf, pts
-        tf, pts = self.fh, getattr(self, "pts", None)
-        if tf is None:
-            return out
-        h2 = (face.shape[0] // 2, face.shape[1] // 2)  # the mask at half size: same shape, a fifth of the cost
-        tf2 = tf.copy(); tf2[:3] *= 0.5
-        mask = cv2.resize(face_mask(pts * 0.5, tf2, h2), (face.shape[1], face.shape[0]), interpolation=cv2.INTER_LINEAR)
-        Mf = sim(tc) @ np.linalg.inv(sim(tf)); bf = tc[:2] - Mf @ tf[:2]   # FlashHead pixels -> clip frame, eye to eye
-        ys, xs = np.nonzero(mask > 0.01)
-        if len(xs) == 0:
-            return out
-        x0, y0, x1, y1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
-        corners = Mf @ np.array([[x0, x1, x0, x1], [y0, y0, y1, y1]], np.float32) + bf[:, None]
-        rx1, ry1 = max(0, int(corners[0].min())), max(0, int(corners[1].min()))
-        rx2, ry2 = min(CANVAS_W, int(np.ceil(corners[0].max()))), min(CANVAS_H, int(np.ceil(corners[1].max())))
-        if rx2 <= rx1 or ry2 <= ry1:
-            return out
-        M = np.hstack([Mf, (bf - (rx1, ry1))[:, None]]); size = (rx2 - rx1, ry2 - ry1)
-        f = cv2.warpAffine(face, M, size, flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE).astype(np.float32)
-        a = cv2.warpAffine(mask, M, size, flags=cv2.INTER_LINEAR, borderValue=0)[..., None]
-        roi = out[ry1:ry2, rx1:rx2].astype(np.float32)
-        m = a[..., 0] > 0.5
-        if m.sum() > 50:  # match the face's colour to the clip's light in this frame
-            mu_f, mu_r = f[m].mean(0), roi[m].mean(0)
-            sd_f, sd_r = f[m].std(0) + 1e-3, roi[m].std(0) + 1e-3
-            f = (f - mu_f) * np.clip(sd_r / sd_f, 0.85, 1.15) + mu_f + np.clip(mu_r - mu_f, -20, 20)
-        out[ry1:ry2, rx1:rx2] = np.clip(f * a + roi * (1 - a), 0, 255).astype(np.uint8)
-        return out
-
-
-def mirror(size, k):
-    turn, r = divmod(k, size)
-    return r if turn % 2 == 0 else size - r - 1
-
-
-def segment_for(text):
-    """Which body clip goes with this answer: lists and strong statements -> emphasis, the rest -> explaining."""
-    import re
-    hits = len(re.findall(r"\b(primero|segundo|tercero|uno|dos|tres|ojo|importante|clave|lo mejor|incre[ií]ble|s[ií] o s[ií]|"
-                          r"first|second|third|important|key|amazing)\b", text, re.I)) + max(0, text.count("!") - 1)
-    return "emphasis" if hits >= 2 else "explain"
+# the gesture layer (clips per moment, anchoring, per-sentence plan) lives in body_layer.py
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from body_layer import BodyClips, segment_for  # noqa: E402
 
 
 class StillBody:
@@ -305,7 +131,7 @@ class Call:
         self.gen, self.idle_i, self.closed = 0, 0, False
         self.channel, self.pending, self.ws = None, [], None
         self.video_q, self.audio_q = asyncio.Queue(maxsize=50), asyncio.Queue(maxsize=100)
-        self.speaking, self.heard_at, self.first_sound = False, None, []
+        self.speaking, self.heard_at, self.first_sound, self.answered = False, None, [], False
         self.tape = []  # her side of the call as played (speech and silences), for the offline engines
         threading.Thread(target=self.worker, daemon=True).start()
 
@@ -403,14 +229,17 @@ class Call:
                         await ws.send(json.dumps({"type": "pong", "event_id": m["ping_event"]["event_id"]}))
                     elif kind == "agent_response":
                         text = m["agent_response_event"]["agent_response"]
-                        if hasattr(self.compose, "set_turn"):
-                            self.compose.set_turn(segment_for(text)); log(f"body for this answer: {segment_for(text)}")
+                        if hasattr(self.compose, "set_plan"):
+                            self.compose.set_plan(text, first_turn=not self.answered); log(f"body plan: {self.compose.plan}")
+                        self.answered = True
                         self.send({"type": "agent", "text": text})
                     elif kind == "agent_response_correction":
                         e = m["agent_response_correction_event"]
                         self.send({"type": "correction", "original": e["original_agent_response"], "corrected": e["corrected_agent_response"]})
                     elif kind == "user_transcript":
                         self.heard_at = time.time(); self.send({"type": "user", "text": m["user_transcription_event"]["user_transcript"]})
+                        if hasattr(self.compose, "thinking"):
+                            self.compose.thinking()
                     elif kind == "conversation_initiation_metadata":
                         self.send({"type": "ready"})
         except Exception as exc:
@@ -519,7 +348,7 @@ def main():
     ap.add_argument("--wav2vec", default="/workspace/models/wav2vec2-base-960h")
     ap.add_argument("--model", default="lite")
     ap.add_argument("--body", default=None, help="one half-body gesture clip (mp4) for every moment")
-    ap.add_argument("--clips", default=None, help="listen=a.mp4,explain=b.mp4,emphasis=c.mp4: a clip per moment of the call")
+    ap.add_argument("--clips", default=None, help="listen=a.mp4,think=b.mp4,greet=c.mp4,explain=d.mp4,emphasis=e.mp4: a clip per moment of the call")
     ap.add_argument("--port", type=int, default=8010)
     a = ap.parse_args()
     cond, body, box = canvas_and_box(a.portrait)
