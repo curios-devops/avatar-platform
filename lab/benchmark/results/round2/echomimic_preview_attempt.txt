@@ -1,0 +1,2 @@
+NVIDIA RTX 6000 Ada Generation
+  4%|▍         | 1/25 [07:59<3:11:38, 479.11s/it]

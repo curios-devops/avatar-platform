@@ -1,4 +1,98 @@
-# Avatar arena V3: half-body presence (2026-11-13, night)
+# Round 2 — body states and a wider arena (2026-11-13, morning)
+
+**The being.** **Jin**, a tech creator (male, East Asian, original), made the MEYA way: described → drawn by
+`gpt-image-2.6-sunburst` (1024×1536, 0.035 USD) in the style of Pruna's p-video-2-pro-avatar "creator" demo (bright
+home office, sweater, hands on the desk), voice ElevenLabs Antonio, `digital-humans/jin.json` (Ada was removed).
+
+**Body states (new).** Three 10 s half-body clips per being, all starting from the portrait's pose, lips closed:
+*listening* (breathing, nods, hands resting), *explaining* (open-hand gestures), *emphasis* (leans in, counts on his
+fingers). Made with Pruna `p-video-2-pro-reference` (768p, mode "cost", ~0.26 USD and ~25–45 s each; one listening clip
+was redone because the camera zoomed in). The local route was ruled out first: the Mac is an M2 Pro with 16 GB, and
+Wan 2.1 image-to-video only exists at 14B (the 1.3B MLX figure, ~90 s per step on an M4 Max, is text-to-video), so a
+10 s clip would take hours, far above the 5 min limit.
+During the call: silence → listening clip; each answer → explaining, or emphasis when its text lists things or insists
+("primero… segundo…", "ojo", "importante", several "!"). Switches cross-fade.
+- MuseTalk: LiveTalking's own silent custom video plays the listening clip; the avatar is built from explaining +
+  emphasis and the ping-pong loop stays inside the chosen segment (`lab/musetalk/patch_states.py`). The "LiveTalking"
+  text it drew on every frame is gone.
+- FlashHead: `fh_server.py --clips listen=…,explain=…,emphasis=…`.
+
+**The round 1 "ghost", explained and fixed.** Two causes. (1) FlashHead moves its own head inside its crop, but the
+face was placed where the *portrait's* eyes were, so it slid over the clip's head. (2) The soft edge of the elliptical
+mask crossed the brows and jaw, so where the two faces differed (the clip's identity drift, raised brows in a gesture)
+both showed at once: double brows. Fix: both sides are now tracked with the same detector (Face Mesh eye corners on the
+clip and on every FlashHead frame), the face is warped eye to eye, and the mask is FlashHead's own face outline, cut
+above the brows and feathered inwards so the seam lies on skin. Checked on the worst case (emphasis clip, leaning in)
+offline and then in a new live call: single brows, eyes in place, no seam. ~20 ms per frame on the CPU.
+
+**The arena.** Live engines ran the real call (guest → Jin's profile → *Videollamada* → ElevenLabs agent; the simulated
+person asks for "three things to look at" in headphones, then about AI code assistants, then interrupts). The others
+rendered 10 s of that call (seconds 11–21: two seconds of listening, then the list answer).
+
+| | MuseTalk + states | FlashHead + states (v2) | Pruna p-video-2-pro-avatar | Boson Higgs Avatar | EchoMimicV3 preview |
+|---|---|---|---|---|---|
+| Mode | **live call** | **live call** | API, batch | API, batch (+ streaming / LiveKit modes) | rendered |
+| Speed | real time (A5000 class) | 2.8× real time (4090), 1.8× (A5000, round 1) | 57 s for 10 s (768p) | **10.7 s for 10 s** (480×640) | did not run (below) |
+| Turn end → first lip-synced frame | ~0.9 s (V1; not measured this round) | **0.54–0.69 s** | n/a | n/a | n/a |
+| Body | states follow the call; emphasis on lists | same clips, same states | **gestures follow the speech** | still | — |
+| Identity (ArcFace mean / p10) | 0.63 / 0.54 | 0.64 / 0.54 | **0.79 / 0.74** | 0.62 / 0.50 | — |
+| Sharpness (face) | 82 | 53 | **159** | 16 | — |
+| Head / body motion | 10.9 / **9.2** | 8.3 / 7.6 | 9.0 / 8.2 | 5.8 / 1.8 | — |
+| Lip-sync proxy | 0.47 (call audio mixes both sides) | 0.09 (WebRTC capture) | 0.46 | 0.33 | — |
+| Cost | ~0.002 USD/min + 3 clips ≈ 0.8 USD once | ~0.0045 USD/min + the same clips | 0.04 USD/s (768p) = 2.4 USD/min | not on the pages read | — |
+
+Videos (`results/round2/`, not in git): `arena_jin_10s.mp4` (the four side by side), `call-musetalk-states_jin.mp4`,
+`call-flashhead-states_jin.mp4` (fixed) and `call-flashhead-states-v1ghost_jin.mp4` (before the fix),
+`render-pruna-avatar_jin.mp4`, `render-boson_jin.mp4`. Clips: `lab/inputs/round2/jin/clips/`.
+
+**EchoMimicV3: why the body did not move, and why it still is out.** Round 1 ran the *Flash* model with talking-head
+settings (8 steps, TeaCache, CFG 6 / audio 3, 373 frames in one go). Their half-body demos use the *preview* model:
+Flow sampler, **25 steps** ("5 for talking head, 15–25 for talking body"), CFG 4 / audio 2.9 with dynamic CFG, a
+negative prompt for hands, 113-frame windows. `lab/echomimic/run_em_preview.py` runs exactly that. It does not fit:
+24 GB (4090) runs out of memory loading the pipeline (its T5 text encoder alone is ~23 GB in fp32); model offload then
+fails in the VAE; sequential offload had not finished one step in 2.5 min. On 48 GB (RTX 6000 Ada) the 113-frame window
+runs out of memory; with 65-frame windows it runs at **479 s per step** (≈13 h for 10 s). Their "12 GB" applies to the
+Flash model through their quantized GradioUI; the half-body preview was tested on an A100 80 GB. Not pursued further.
+
+**Real time: estimates only (no multi-GPU runs).**
+- EchoMimic Flash measured 237 s of denoising for 15 s on an A100 (≈16× slower than real time). Real time needs
+  ≈16 A100-equivalents ≈ 6 H100 at perfect scaling, ~8 H100 with sequence parallelism (Ulysses, in their code) at
+  realistic efficiency: ~21 USD/h per call on RunPod community H100 SXM (2.69 USD/h), and the latency is at least one
+  window (4.5 s at 113 frames). The body-capable preview needs ~3× the steps plus extra CFG passes: dozens of H100.
+  Not a live option.
+- LiveAvatar: 23× slower than real time on one A100 (round 1). Its authors report 45 fps on 5× H800 (4 steps,
+  pipeline over 5 GPUs, v1.1). Minimum for one live call: **5× H100 80 GB SXM** (NVLink; an H800 is an H100 with
+  slower interconnect); a planned 3-step version would need 4. Cost: 5 × 2.69 ≈ **13.5 USD/h ≈ 0.22 USD per call-minute**
+  (community), ~22 USD/h secure, about 100× MuseTalk. A100s do not get there (no FP8, ~⅓ of an H100).
+- Pruna avatar: no streaming or real-time mode documented; 768p took 5.7× the audio length, 480p is documented at
+  ~1× of execution. Even sentence by sentence that is seconds of delay and 1.2–2.4 USD per minute.
+- Boson: the batch call already ran at ~1× (10.7 s for 10 s with upload and queue), and it has a streaming endpoint
+  (fragmented MP4) and a LiveKit real-time mode: the only hosted option here that could be live. Its picture is the
+  weakest (480×640, identity 0.62, still body).
+
+**Reading.** The states turn the gesture loop into a body that agrees with the call: still and attentive while the
+person talks, open hands while explaining, counting on fingers when the answer is a list. Both live engines carry it;
+the arena's best *picture* is Pruna's avatar (speech-driven gestures, sharp, true to the portrait), but it is batch.
+The live engines' identity (~0.63) is held back by the clips themselves (generated from the portrait, they drift).
+
+**Recommendation, round 2.**
+- **Live calls: MuseTalk + states**, primary: real time on the cheapest card, two calls per GPU, the sharpest live
+  face and the most body. **FlashHead + states (v2)** next to it: faster turn start (0.54–0.69 s), clearer articulation;
+  the ghost is gone, so it stays in the race.
+- Next: make the explaining/emphasis clips with **Pruna p-video-2-pro-avatar** (driven by a sample sentence, so the
+  gestures are speech-shaped) instead of the reference model; add a "thinking" and a "greeting" clip; choose the clip
+  per sentence, not per answer; keep each clip closer to the portrait (identity).
+- **Pre-recorded content: Pruna p-video-2-pro-avatar** (or LiveAvatar where its licence allows).
+- **Boson**: worth one live test through its LiveKit mode if a hosted live face is ever wanted.
+- **EchoMimic**: out (not live-capable; its body model needs an 80 GB GPU for a slow offline render).
+
+Cost of round 2: RunPod 0.88 USD (4090 secure 0.89 USD/h for the calls, cut by its own 0.6 USD watchdog before the
+EchoMimic attempt finished; RTX 6000 Ada 1.09 USD/h for EchoMimic), Pruna ≈1.4 USD (4 clips + avatar), OpenAI 0.07,
+Boson a few cents: **≈2.4 USD**.
+
+---
+
+# Round 1 — avatar arena V3: half-body presence (2026-11-13, night)
 
 Question: a face that only moves its mouth is not presence. Can we get a half-body being that breathes, moves head,
 shoulders and hands, and still talks live? Same being, same call, every engine.
@@ -38,7 +132,7 @@ engines wear the same body.
 | GPU per minute | ~0.002 USD (2 calls/GPU) | ~0.0045 USD (1 call/GPU) | ~0.63 USD per minute of video | ~0.53 USD per minute of video; live ≈ 5×80 GB ≈ 0.2 USD per call-minute |
 | One-off per being | body clip 0.20 + avatar build 3 min | body clip 0.20 | none | none |
 
-Videos (`results/arena/`, not in git): `arena_ada_12s.mp4` (the four side by side, her voice from the call),
+Videos (`results/round1/`, not in git): `arena_ada_12s.mp4` (the four side by side, her voice from the call),
 `call-{musetalk,flashhead}-body_ada.mp4` (the whole live calls, both sides), `render-{echomimic,liveavatar}_ada.mp4`.
 Logs: `live_calls.txt`, `big_pod_times.txt`. Metrics: `results/metrics.json` (`metrics.py` now also measures body motion).
 

@@ -57,14 +57,14 @@ def create(image=None):
     pub = pathlib.Path.home().joinpath(".ssh/runpod_a2.pub").read_text().strip()
     extra = {**r2_env(), "MAX_SECONDS": __import__("os").environ.get("MAX_SECONDS", "4500")} if image else {}
     b = balance(); (HERE / "start_balance.json").write_text(json.dumps(b)); print("saldo", round(b["clientBalance"], 4))
-    for cloud in ("COMMUNITY", "SECURE"):
+    for cloud in os.environ.get("CLOUD", "COMMUNITY,SECURE").split(","):
         s, p = req("https://rest.runpod.io/v1/pods", {
             "name": os.environ.get("NAME", "meya-livetalking"),
             "imageName": os.environ.get("IMAGE") or image or "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04",
             "cloudType": cloud, "gpuTypeIds": gpus, "gpuTypePriority": "custom", "gpuCount": 1,
             "containerDiskInGb": int(os.environ.get("DISK", "50")), "volumeInGb": 0,
             **({"allowedCudaVersions": os.environ["CUDA"].split(",")} if os.environ.get("CUDA") else {}),
-            "ports": ["22/tcp", "8010/http"], "supportPublicIp": True, "env": {"PUBLIC_KEY": pub, **extra}})
+            "ports": ["22/tcp", "8010/http", "8011/http"], "supportPublicIp": True, "env": {"PUBLIC_KEY": pub, **extra}})
         print(cloud, s, p if s >= 300 else {k: p.get(k) for k in ("id", "costPerHr", "machineId")})
         if s < 300:
             (HERE / "pod_id").write_text(p["id"]); (HERE / f"pod_id_{os.environ.get('NAME', 'meya-livetalking')}").write_text(p["id"]); return

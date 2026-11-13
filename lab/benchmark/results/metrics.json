@@ -211,5 +211,61 @@
     "motion_pct": 7.13,
     "body_motion": 4.19,
     "faces": 1.0
+  },
+  "live-musetalk-states_jin": {
+    "case": "jin",
+    "resolution": "768x1152",
+    "fps": 25.0,
+    "seconds": 10.08,
+    "identity_mean": 0.633,
+    "identity_p10": 0.541,
+    "lipsync_corr": 0.467,
+    "lipsync_lag_ms": -200,
+    "sharpness": 81.6,
+    "motion_pct": 10.89,
+    "body_motion": 9.23,
+    "faces": 1.0
+  },
+  "render-pruna-avatar_jin": {
+    "case": "jin",
+    "resolution": "768x1152",
+    "fps": 24.0,
+    "seconds": 10.0,
+    "identity_mean": 0.785,
+    "identity_p10": 0.744,
+    "lipsync_corr": 0.456,
+    "lipsync_lag_ms": 42,
+    "sharpness": 159.3,
+    "motion_pct": 8.98,
+    "body_motion": 8.19,
+    "faces": 1.0
+  },
+  "render-boson_jin": {
+    "case": "jin",
+    "resolution": "480x640",
+    "fps": 24.0,
+    "seconds": 10.58,
+    "identity_mean": 0.618,
+    "identity_p10": 0.504,
+    "lipsync_corr": 0.326,
+    "lipsync_lag_ms": 125,
+    "sharpness": 15.5,
+    "motion_pct": 5.78,
+    "body_motion": 1.8,
+    "faces": 1.0
+  },
+  "live-flashhead-states_jin": {
+    "case": "jin",
+    "resolution": "720x1280",
+    "fps": 25.0,
+    "seconds": 10.0,
+    "identity_mean": 0.637,
+    "identity_p10": 0.544,
+    "lipsync_corr": 0.093,
+    "lipsync_lag_ms": 200,
+    "sharpness": 52.7,
+    "motion_pct": 8.25,
+    "body_motion": 7.55,
+    "faces": 1.0
   }
 }

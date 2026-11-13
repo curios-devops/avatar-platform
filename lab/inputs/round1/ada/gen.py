@@ -2,7 +2,7 @@
 import base64, json, pathlib, sys, time, concurrent.futures as cf
 import httpx
 HERE = pathlib.Path(__file__).parent
-ENV = dict(l.split("=", 1) for l in (HERE.parents[2] / "backend/.env").read_text().splitlines() if "=" in l and not l.lstrip().startswith("#"))
+ENV = dict(l.split("=", 1) for l in (HERE.parents[3] / "backend/.env").read_text().splitlines() if "=" in l and not l.lstrip().startswith("#"))
 KEY = ENV["OPENAI_API_KEY"].strip().strip('"')
 PROMPT = ("Photorealistic vertical photo of Ada, an original MEYA tech creator who talks about AI, new gadgets and nerd "
           "culture: a Latina woman around thirty with a short dark brown wavy bob, warm brown eyes, light freckles, small "

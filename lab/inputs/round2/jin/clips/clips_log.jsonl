@@ -1,0 +1,5 @@
+{"state": "listen", "seconds": 27.9, "bytes": 3488661, "model": "p-video-2-pro-reference"}
+{"state": "explain", "seconds": 42.7, "bytes": 3188125, "model": "p-video-2-pro-reference"}
+{"state": "emphasis", "error": "500 {\"status\":\"failed\",\"error\":\"Prediction failed: Async prediction failed: ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))\",\"message\":\"Prediction failed\",\"moderation\":null}\n", "model": "p-video-2-pro-reference"}
+{"state": "emphasis", "seconds": 23.2, "bytes": 3174490, "model": "p-video-2-pro-reference"}
+{"state": "listen", "seconds": 23.1, "bytes": 2671555, "model": "p-video-2-pro-reference"}

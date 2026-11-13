@@ -1,0 +1,14 @@
+Round 2, 2026-11-13. Live calls through the MEYA web (guest, Jin's profile -> Videollamada), fake mic: jin_user.wav
+("¿Qué tres cosas debo mirar?" -> list answer; "¿vale la pena un asistente de código?"; "Espera, espera. Dímelo en una sola frase.").
+Pod: RTX 4090 secure, 0.89 USD/h (no A5000 free in secure; community hosts can drop WebRTC UDP).
+
+MuseTalk 1.5 + states (LiveTalking, patch_states.py): avatar = explaining + emphasis clips (506 frames, built in 5.8 min);
+  listening = custom silent video (253 frames). Bridge picked: emphasis for "[excited] ¡Buena elección! Mira, primero, la
+  calidad de la cancelación de ruido…", explain for the others. Barge-in honoured. Guest minute ended with the invite.
+FlashHead Lite + states, v1 (ellipse mask): chunks 0.34-0.38 s per 0.96 s (2.8x real time); latency 0.54-0.61 s;
+  emphasis for the list answer. Faint double brows at 14/20/41 s -> fixed.
+FlashHead Lite + states, v2 (Face Mesh registration + outline mask): warm-up 45 s (cached); latency 0.69, 0.61, 0.61,
+  0.57 s; chunks median 0.37 s, max 0.84 s; emphasis for the list answer; no double features.
+Rendered from the call tape, seconds 11-21: Pruna p-video-2-pro-avatar 768p 57.4 s; Boson higgs-avatar 480x640 10.7 s.
+EchoMimicV3 preview (authors' settings): OOM on 24 GB (load, VAE), sequential offload < 1 step in 2.5 min; OOM on 48 GB
+  at 113-frame windows; 479 s/step at 65-frame windows on an RTX 6000 Ada -> stopped.
