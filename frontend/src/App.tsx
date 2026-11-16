@@ -5,6 +5,8 @@ import { FeedMode } from './pages/FeedMode';
 import { HumanLab } from './pages/HumanLab';
 import { Studio } from './human/studio/Studio';
 import { Generate } from './human/studio/Generate';
+import { Arena4 } from './human/Arena4';
+import { Embed } from './human/Embed';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8000';
 
@@ -36,7 +38,7 @@ function App() {
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000' }}>
+    <div style={{ width: '100vw', height: '100vh', backgroundColor: HUMAN_MODE === 'embed' ? 'transparent' : '#000' }}>
       {BACK_TO_MEYA && currentView === 'upload' && (
         <a href={BACK_TO_MEYA} style={{
           position: 'fixed', top: 16, left: 16, zIndex: 10, padding: '8px 14px',
@@ -47,6 +49,8 @@ function App() {
       {currentView === 'human' ? (
         HUMAN_MODE === 'lab' ? <HumanLab serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />
           : HUMAN_MODE === 'gen' ? <Generate />
+          : HUMAN_MODE === 'arena4' ? <Arena4 />
+          : HUMAN_MODE === 'embed' ? <Embed />
           : <Studio serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />
       ) : currentView === 'feed' ? (
         <FeedMode serverUrl={SERVER_URL} onBack={() => setCurrentView('upload')} />

@@ -10,4 +10,5 @@ for pack in makehuman_system_assets_cc0 skins01_cc0 skins02_cc0 hair01_cc0 hair0
   mkdir -p "$pack" && unzip -q -o "$pack.zip" -d "$pack" && rm "$pack.zip"
 done
 ../.venv/bin/python ../fix_pngs.py .
+../.venv/bin/python ../clean_logos.py  # plain tees: no MakeHuman mark on the chest
 echo "assets ready in $(pwd)"

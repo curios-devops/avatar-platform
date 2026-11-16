@@ -91,7 +91,7 @@ export const GARMENT_NAMES: Record<string, string> = {
   female_casualsuit01: L('Tee and jeans', 'Camiseta y vaqueros'), female_casualsuit02: L('Tee and denim shorts', 'Camiseta y short vaquero'),
   female_elegantsuit01: L('Striped blouse and skirt', 'Blusa de rayas y falda'), female_sportsuit01: L('Crop top and leggings', 'Top corto y mallas'),
   male_casualsuit01: L('Denim shirt and jeans', 'Camisa vaquera'), male_casualsuit02: L('Long-sleeve tee and jeans', 'Manga larga y vaqueros'),
-  male_casualsuit03: L('Striped shirt and jeans', 'Camisa de rayas'), male_casualsuit04: L('Logo tee and jeans', 'Camiseta con logo'),
+  male_casualsuit03: L('Striped shirt and jeans', 'Camisa de rayas'), male_casualsuit04: L('Blue tee and jeans', 'Camiseta azul'),
   male_casualsuit05: L('Field jacket', 'Chaqueta militar'), male_casualsuit06: L('White tee and jeans', 'Camiseta blanca'),
   male_elegantsuit01: L('Suit and tie', 'Traje y corbata'), male_worksuit01: L('Denim overalls', 'Peto vaquero'),
   shoes01: L('Brown leather shoes', 'Zapatos de piel'), shoes02: L('Worn sneakers', 'Zapatillas gastadas'),

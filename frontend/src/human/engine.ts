@@ -28,18 +28,53 @@ const Z = new THREE.Vector3(0, 0, 1);
 const key = (name: string) => name.replace(/[[\].:/]/g, '').replace(/\s/g, '_');
 
 /**
+ * Five MakeHuman tees print the MakeHuman mark, someone else's brand. human/clean_logos.py writes plain copies
+ * to assets_src/nologo/ (fetch_assets.sh runs it) and every garment loads those instead.
+ */
+const NOLOGO = new Set(['female_casualsuit01', 'female_casualsuit02', 'male_casualsuit02', 'male_casualsuit04', 'male_casualsuit06']);
+const plainCloth = (path?: string) => {
+  const id = path?.match(/([a-z0-9_]+)_diffuse\.png$/)?.[1];
+  return id && NOLOGO.has(id) ? `nologo/${id}_diffuse.png` : path;
+};
+
+/**
+ * One MakeHuman outfit is one mesh and one texture (tee and jeans together), so a dye used to turn the jeans red
+ * along with the shirt. These UV boxes (x0, y0, x1, y1; v down, as the baker writes it) hold the denim or the
+ * leggings and keep their own colour. Measured on the textures' islands; outfits not listed dye whole.
+ */
+const DYE_KEEP: Record<string, [number, number, number, number][]> = {
+  female_casualsuit01: [[0, 0.43, 0.77, 0.575], [0, 0.575, 0.728, 1]],
+  female_casualsuit02: [[0, 0.4, 0.73, 1]],
+  female_sportsuit01: [[0, 0.43, 0.77, 0.575], [0, 0.575, 0.728, 1]],
+  male_casualsuit02: [[0, 0.405, 0.775, 1]],
+  male_casualsuit04: [[0, 0.4, 1, 1]],
+  male_casualsuit05: [[0, 0.555, 0.595, 1]],
+  male_casualsuit06: [[0, 0.42, 1, 1]],
+};
+
+/**
  * Dye a garment: a multiply tint cannot turn a blue tee white, so the texture is taken to luminance and
  * the new colour painted over it, keeping a third of the original shading for seams, folds and prints.
  */
-function dye(m: THREE.MeshPhysicalMaterial, hex: string) {
+function dye(m: THREE.MeshPhysicalMaterial, hex: string, garment = '') {
   const c = new THREE.Color(hex);
+  const keep = [...(DYE_KEEP[garment] ?? []), [2, 2, 2, 2], [2, 2, 2, 2]].slice(0, 2).map((b) => new THREE.Vector4(...b));
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uDye = { value: c };
+    sh.uniforms.uKeep0 = { value: keep[0] };
+    sh.uniforms.uKeep1 = { value: keep[1] };
     sh.fragmentShader = sh.fragmentShader
-      .replace('void main() {', 'uniform vec3 uDye;\nvoid main() {')
+      .replace('void main() {', 'uniform vec3 uDye;\nuniform vec4 uKeep0;\nuniform vec4 uKeep1;\nvoid main() {')
       .replace('#include <map_fragment>', `#include <map_fragment>
         float dyeL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-        diffuseColor.rgb = uDye * mix(1.0, clamp(dyeL / 0.42, 0.25, 1.6), 0.35);`);
+        vec3 dyed = uDye * mix(1.0, clamp(dyeL / 0.42, 0.25, 1.6), 0.35);
+        #ifdef USE_MAP
+          bool dyeKeep = (all(greaterThanEqual(vMapUv, uKeep0.xy)) && all(lessThanEqual(vMapUv, uKeep0.zw)))
+            || (all(greaterThanEqual(vMapUv, uKeep1.xy)) && all(lessThanEqual(vMapUv, uKeep1.zw)));
+          if (!dyeKeep) diffuseColor.rgb = dyed;
+        #else
+          diffuseColor.rgb = dyed;
+        #endif`);
   };
   m.customProgramCacheKey = () => 'dye';
 }
@@ -497,7 +532,7 @@ export class HumanEngine {
       skinShader(m);
       return m;
     }
-    const diffuse = kind === 'eyes' && this.look.eyes ? this.look.eyes : extras.diffuseTexture;
+    const diffuse = kind === 'eyes' && this.look.eyes ? this.look.eyes : plainCloth(extras.diffuseTexture);
     const cutout = ['hair', 'eyebrows', 'eyelashes'].includes(kind) || extras.transparent;
     const m = new THREE.MeshPhysicalMaterial({
       map: diffuse ? await this.tex(diffuse) : null,
@@ -520,7 +555,7 @@ export class HumanEngine {
     if (kind === 'hair') { m.roughness = 0.5; m.specularIntensity = 0.4; hairShader(m, this.look.hairColor); }
     if (kind === 'teeth' || kind === 'tongue') mouthShader(m, kind, this.mouthU);
     const recolor = kind === 'clothes' ? this.look.tints?.[name] : undefined;
-    if (recolor && recolor.toLowerCase() !== '#ffffff') dye(m, recolor);
+    if (recolor && recolor.toLowerCase() !== '#ffffff') dye(m, recolor, name);
     return m;
   }
 
