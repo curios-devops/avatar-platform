@@ -1,0 +1,214 @@
+{
+ "rig": "anny",
+ "source": "audio2face-3d-v3.0 Mark",
+ "shapes": {
+  "eyeBlinkLeft": {
+   "rest": 0.0002,
+   "gain": 1.0
+  },
+  "eyeLookDownLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookInLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookOutLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookUpLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeSquintLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeWideLeft": {
+   "rest": 0.0003,
+   "gain": 1.0
+  },
+  "eyeBlinkRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookDownRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookInRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookOutRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeLookUpRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeSquintRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "eyeWideRight": {
+   "rest": 0.0004,
+   "gain": 1.0
+  },
+  "jawForward": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "jawLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "jawRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "jawOpen": {
+   "rest": 0.0309,
+   "gain": 1.614
+  },
+  "mouthClose": {
+   "rest": 0.1022,
+   "gain": 0.25
+  },
+  "mouthFunnel": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthPucker": {
+   "rest": 0.0956,
+   "gain": 1.0
+  },
+  "mouthLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthSmileLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthSmileRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthFrownLeft": {
+   "rest": 0.029,
+   "gain": 1.0
+  },
+  "mouthFrownRight": {
+   "rest": 0.0287,
+   "gain": 1.0
+  },
+  "mouthDimpleLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthDimpleRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthStretchLeft": {
+   "rest": 0.092,
+   "gain": 1.0
+  },
+  "mouthStretchRight": {
+   "rest": 0.094,
+   "gain": 1.0
+  },
+  "mouthRollLower": {
+   "rest": 0.2281,
+   "gain": 0.3
+  },
+  "mouthRollUpper": {
+   "rest": 0.0,
+   "gain": 0.5
+  },
+  "mouthShrugLower": {
+   "rest": 0.0718,
+   "gain": 0.6
+  },
+  "mouthShrugUpper": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthPressLeft": {
+   "rest": 0.0729,
+   "gain": 0.5
+  },
+  "mouthPressRight": {
+   "rest": 0.074,
+   "gain": 0.5
+  },
+  "mouthLowerDownLeft": {
+   "rest": 0.0,
+   "gain": 1.3
+  },
+  "mouthLowerDownRight": {
+   "rest": 0.0,
+   "gain": 1.3
+  },
+  "mouthUpperUpLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "mouthUpperUpRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "browDownLeft": {
+   "rest": 0.0007,
+   "gain": 1.0
+  },
+  "browDownRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "browInnerUp": {
+   "rest": 0.0199,
+   "gain": 0.7
+  },
+  "browOuterUpLeft": {
+   "rest": 0.056,
+   "gain": 0.7
+  },
+  "browOuterUpRight": {
+   "rest": 0.057,
+   "gain": 0.7
+  },
+  "cheekPuff": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "cheekSquintLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "cheekSquintRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "noseSneerLeft": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "noseSneerRight": {
+   "rest": 0.0,
+   "gain": 1.0
+  },
+  "tongueOut": {
+   "rest": 0.0,
+   "gain": 1.0
+  }
+ }
+}

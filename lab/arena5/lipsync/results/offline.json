@@ -1,0 +1,1744 @@
+{
+ "sampleRate": 24000,
+ "fps": 60,
+ "engine": {
+  "fftSize": 256,
+  "silenceThreshold": 0.015,
+  "smoothingFactor": 0.35,
+  "holdFrames": 2,
+  "intensitySmoothing": 0.2,
+  "energySmoothing": 0.5
+ },
+ "clips": {
+  "nova_es_t": {
+   "lang": "es",
+   "seconds": 3.32,
+   "speakingS": 2.17,
+   "A": {
+    "r": 0.924,
+    "lagMs": 17,
+    "r0": 0.834,
+    "eventsPerS": 6.6,
+    "openSpeaking": 0.524,
+    "openSilent": 0.127,
+    "visemes": {
+     "aa": 0.628,
+     "sil": 0.372
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.229,
+    "lagMs": -250,
+    "r0": 0.15,
+    "eventsPerS": 10.6,
+    "openSpeaking": 0.165,
+    "openSilent": 0.065,
+    "visemes": {
+     "sil": 0.412,
+     "PP": 0.256,
+     "I": 0.241,
+     "O": 0.05,
+     "aa": 0.03,
+     "E": 0.01
+    },
+    "loudClosed": 0.576,
+    "nodeUsPerFrame": 32.4
+   },
+   "Bq": {
+    "r": 0.745,
+    "lagMs": 33,
+    "r0": 0.608,
+    "eventsPerS": 9.6,
+    "openSpeaking": 0.176,
+    "openSilent": 0.038,
+    "visemes": {
+     "sil": 0.578,
+     "I": 0.291,
+     "E": 0.045,
+     "PP": 0.035,
+     "O": 0.03,
+     "aa": 0.02
+    },
+    "loudClosed": 0.152
+   },
+   "H": {
+    "r": 0.179,
+    "lagMs": 250,
+    "r0": -0.176,
+    "eventsPerS": 6.9,
+    "openSpeaking": 0.18,
+    "openSilent": 0.184,
+    "visemes": {
+     "RR": 0.181,
+     "CH": 0.171,
+     "kk": 0.171,
+     "sil": 0.156,
+     "SS": 0.126,
+     "DD": 0.085,
+     "TH": 0.04,
+     "nn": 0.04,
+     "O": 0.03
+    },
+    "loudClosed": 0.424,
+    "nodeUsPerFrame": 101.1
+   },
+   "Hw": {
+    "r": 0.34,
+    "lagMs": 133,
+    "r0": -0.032,
+    "eventsPerS": 6.6,
+    "openSpeaking": 0.2,
+    "openSilent": 0.193,
+    "visemes": {
+     "RR": 0.226,
+     "kk": 0.226,
+     "sil": 0.141,
+     "CH": 0.131,
+     "DD": 0.085,
+     "SS": 0.08,
+     "TH": 0.04,
+     "nn": 0.04,
+     "O": 0.03
+    },
+    "loudClosed": 0.121
+   },
+   "text": "¡Hola! Pregúntame lo que quieras sobre el espacio.",
+   "C": {
+    "r": 0.352,
+    "lagMs": 117,
+    "r0": 0.069,
+    "eventsPerS": 11.2,
+    "openSpeaking": 0.371,
+    "openSilent": 0.211,
+    "visemes": {
+     "sil": 0.256,
+     "E": 0.136,
+     "SS": 0.121,
+     "DD": 0.101,
+     "O": 0.08,
+     "kk": 0.08,
+     "aa": 0.075,
+     "PP": 0.075,
+     "I": 0.04,
+     "U": 0.02,
+     "nn": 0.015
+    },
+    "cues": 38,
+    "loudClosed": 0.303
+   },
+   "C0": {
+    "r": 0.425,
+    "lagMs": 167,
+    "r0": 0.161,
+    "eventsPerS": 11.2,
+    "openSpeaking": 0.385,
+    "openSilent": 0.222,
+    "visemes": {
+     "sil": 0.246,
+     "DD": 0.146,
+     "E": 0.146,
+     "O": 0.09,
+     "kk": 0.08,
+     "PP": 0.075,
+     "SS": 0.075,
+     "aa": 0.065,
+     "I": 0.04,
+     "U": 0.02,
+     "nn": 0.015
+    }
+   },
+   "Cl": {
+    "r": 0.367,
+    "lagMs": 67,
+    "r0": 0.291,
+    "eventsPerS": 11.2,
+    "openSpeaking": 0.392,
+    "openSilent": 0.172,
+    "visemes": {
+     "sil": 0.256,
+     "E": 0.136,
+     "SS": 0.121,
+     "DD": 0.101,
+     "O": 0.08,
+     "kk": 0.08,
+     "aa": 0.075,
+     "PP": 0.075,
+     "I": 0.04,
+     "U": 0.02,
+     "nn": 0.015
+    },
+    "leadMs": 50
+   },
+   "vsC": {
+    "A": {
+     "classes": {
+      "agree": 0.731,
+      "chance": 0.697,
+      "kappa": 0.112,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 0.479,
+      "lagMs": -67,
+      "r0": 0.369
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 1,
+      "hitRate": 1,
+      "testOnsets": 4,
+      "precision": 0.25,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 0,
+      "precision": null,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     }
+    },
+    "B": {
+     "classes": {
+      "agree": 0.585,
+      "chance": 0.433,
+      "kappa": 0.267,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 0.496,
+      "lagMs": -17,
+      "r0": 0.481
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 1,
+      "hitRate": 1,
+      "testOnsets": 10,
+      "precision": 0.2,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 1,
+      "hitRate": 0.2,
+      "testOnsets": 1,
+      "precision": 1,
+      "medianMs": 200,
+      "medianAbsMs": 200
+     }
+    },
+    "Bq": {
+     "classes": {
+      "agree": 0.577,
+      "chance": 0.533,
+      "kappa": 0.094,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 0.37,
+      "lagMs": -217,
+      "r0": 0.127
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 1,
+      "hitRate": 1,
+      "testOnsets": 7,
+      "precision": 0.286,
+      "medianMs": -83,
+      "medianAbsMs": 83
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 1,
+      "hitRate": 0.2,
+      "testOnsets": 1,
+      "precision": 1,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     }
+    },
+    "H": {
+     "classes": {
+      "agree": 0.577,
+      "chance": 0.451,
+      "kappa": 0.23,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 0.507,
+      "lagMs": 150,
+      "r0": 0.212
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 1,
+      "precision": 0,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 3,
+      "hitRate": 0.6,
+      "testOnsets": 5,
+      "precision": 0.6,
+      "medianMs": -83,
+      "medianAbsMs": 83
+     }
+    },
+    "Hw": {
+     "classes": {
+      "agree": 0.538,
+      "chance": 0.489,
+      "kappa": 0.098,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 0.286,
+      "lagMs": 133,
+      "r0": 0.18
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 1,
+      "precision": 0,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 3,
+      "hitRate": 0.6,
+      "testOnsets": 5,
+      "precision": 0.6,
+      "medianMs": -100,
+      "medianAbsMs": 100
+     }
+    },
+    "C0": {
+     "classes": {
+      "agree": 0.731,
+      "chance": 0.55,
+      "kappa": 0.401,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 0.727,
+      "lagMs": -50,
+      "r0": 0.581
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 1,
+      "precision": 0,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 5,
+      "hitRate": 1,
+      "testOnsets": 5,
+      "precision": 1,
+      "medianMs": -67,
+      "medianAbsMs": 67
+     }
+    },
+    "Cl": {
+     "classes": {
+      "agree": 0.769,
+      "chance": 0.573,
+      "kappa": 0.46,
+      "frames": 130
+     },
+     "openingLag": {
+      "r": 1,
+      "lagMs": -50,
+      "r0": 0.69
+     },
+     "closedOnsets": {
+      "onsets": 1,
+      "matched": 1,
+      "hitRate": 1,
+      "testOnsets": 3,
+      "precision": 0.333,
+      "medianMs": -50,
+      "medianAbsMs": 50
+     },
+     "roundedOnsets": {
+      "onsets": 5,
+      "matched": 5,
+      "hitRate": 1,
+      "testOnsets": 5,
+      "precision": 1,
+      "medianMs": -50,
+      "medianAbsMs": 50
+     }
+    }
+   }
+  },
+  "hana_es_t": {
+   "lang": "es",
+   "seconds": 3.32,
+   "speakingS": 2.18,
+   "A": {
+    "r": 0.92,
+    "lagMs": 17,
+    "r0": 0.866,
+    "eventsPerS": 4.8,
+    "openSpeaking": 0.599,
+    "openSilent": 0.098,
+    "visemes": {
+     "aa": 0.613,
+     "sil": 0.387
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.521,
+    "lagMs": 250,
+    "r0": 0.283,
+    "eventsPerS": 10.9,
+    "openSpeaking": 0.268,
+    "openSilent": 0.066,
+    "visemes": {
+     "sil": 0.402,
+     "PP": 0.196,
+     "O": 0.171,
+     "I": 0.101,
+     "nn": 0.07,
+     "aa": 0.055,
+     "U": 0.005
+    },
+    "loudClosed": 0.545,
+    "nodeUsPerFrame": 13.1
+   },
+   "Bq": {
+    "r": 0.886,
+    "lagMs": 33,
+    "r0": 0.786,
+    "eventsPerS": 8.4,
+    "openSpeaking": 0.221,
+    "openSilent": 0.024,
+    "visemes": {
+     "sil": 0.503,
+     "I": 0.236,
+     "O": 0.156,
+     "nn": 0.08,
+     "E": 0.015,
+     "PP": 0.01
+    },
+    "loudClosed": 0
+   },
+   "H": {
+    "r": 0.322,
+    "lagMs": 250,
+    "r0": 0.212,
+    "eventsPerS": 6.9,
+    "openSpeaking": 0.234,
+    "openSilent": 0.173,
+    "visemes": {
+     "TH": 0.181,
+     "sil": 0.171,
+     "I": 0.166,
+     "DD": 0.131,
+     "E": 0.085,
+     "kk": 0.085,
+     "nn": 0.08,
+     "SS": 0.04,
+     "RR": 0.04,
+     "CH": 0.02
+    },
+    "loudClosed": 0,
+    "nodeUsPerFrame": 48.4
+   },
+   "Hw": {
+    "r": 0.339,
+    "lagMs": 67,
+    "r0": 0.244,
+    "eventsPerS": 6.9,
+    "openSpeaking": 0.242,
+    "openSilent": 0.181,
+    "visemes": {
+     "I": 0.206,
+     "sil": 0.151,
+     "DD": 0.131,
+     "TH": 0.121,
+     "E": 0.085,
+     "kk": 0.085,
+     "nn": 0.08,
+     "CH": 0.06,
+     "SS": 0.04,
+     "RR": 0.04
+    },
+    "loudClosed": 0
+   },
+   "text": "¿Te cuento un cuento? Primero dime tu nombre.",
+   "C": {
+    "r": 0.522,
+    "lagMs": 67,
+    "r0": 0.461,
+    "eventsPerS": 11.5,
+    "openSpeaking": 0.287,
+    "openSilent": 0.098,
+    "visemes": {
+     "sil": 0.382,
+     "DD": 0.136,
+     "E": 0.116,
+     "U": 0.116,
+     "PP": 0.065,
+     "nn": 0.055,
+     "O": 0.055,
+     "kk": 0.045,
+     "I": 0.03
+    },
+    "cues": 39,
+    "loudClosed": 0
+   },
+   "C0": {
+    "r": 0.528,
+    "lagMs": 67,
+    "r0": 0.42,
+    "eventsPerS": 10.9,
+    "openSpeaking": 0.307,
+    "openSilent": 0.166,
+    "visemes": {
+     "sil": 0.271,
+     "DD": 0.166,
+     "E": 0.126,
+     "O": 0.095,
+     "PP": 0.09,
+     "nn": 0.085,
+     "U": 0.08,
+     "kk": 0.045,
+     "I": 0.04
+    }
+   },
+   "Cl": {
+    "r": 0.536,
+    "lagMs": 17,
+    "r0": 0.531,
+    "eventsPerS": 11.2,
+    "openSpeaking": 0.285,
+    "openSilent": 0.101,
+    "visemes": {
+     "sil": 0.387,
+     "DD": 0.131,
+     "E": 0.116,
+     "U": 0.116,
+     "PP": 0.065,
+     "O": 0.06,
+     "nn": 0.05,
+     "kk": 0.045,
+     "I": 0.03
+    },
+    "leadMs": 50
+   },
+   "vsC": {
+    "A": {
+     "classes": {
+      "agree": 0.542,
+      "chance": 0.546,
+      "kappa": -0.01,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 0.608,
+      "lagMs": 33,
+      "r0": 0.605
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 2,
+      "hitRate": 0.5,
+      "testOnsets": 2,
+      "precision": 1,
+      "medianMs": 33,
+      "medianAbsMs": 33
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 0,
+      "precision": null,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     }
+    },
+    "B": {
+     "classes": {
+      "agree": 0.359,
+      "chance": 0.38,
+      "kappa": -0.033,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 0.467,
+      "lagMs": 83,
+      "r0": 0.265
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 3,
+      "hitRate": 0.75,
+      "testOnsets": 7,
+      "precision": 0.429,
+      "medianMs": -33,
+      "medianAbsMs": 33
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 4,
+      "hitRate": 0.571,
+      "testOnsets": 5,
+      "precision": 0.6,
+      "medianMs": 33,
+      "medianAbsMs": 83
+     }
+    },
+    "Bq": {
+     "classes": {
+      "agree": 0.389,
+      "chance": 0.383,
+      "kappa": 0.011,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 0.55,
+      "lagMs": -33,
+      "r0": 0.539
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 3,
+      "hitRate": 0.75,
+      "testOnsets": 6,
+      "precision": 0.5,
+      "medianMs": 100,
+      "medianAbsMs": 100
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 4,
+      "hitRate": 0.571,
+      "testOnsets": 4,
+      "precision": 0.75,
+      "medianMs": 83,
+      "medianAbsMs": 100
+     }
+    },
+    "H": {
+     "classes": {
+      "agree": 0.496,
+      "chance": 0.523,
+      "kappa": -0.057,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 0.417,
+      "lagMs": 150,
+      "r0": 0.224
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 0,
+      "precision": null,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 1,
+      "hitRate": 0.143,
+      "testOnsets": 1,
+      "precision": 1,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     }
+    },
+    "Hw": {
+     "classes": {
+      "agree": 0.55,
+      "chance": 0.518,
+      "kappa": 0.065,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 0.479,
+      "lagMs": 117,
+      "r0": 0.271
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 0,
+      "precision": null,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 3,
+      "hitRate": 0.429,
+      "testOnsets": 2,
+      "precision": 1,
+      "medianMs": 0,
+      "medianAbsMs": 17
+     }
+    },
+    "C0": {
+     "classes": {
+      "agree": 0.405,
+      "chance": 0.458,
+      "kappa": -0.098,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 0.314,
+      "lagMs": 250,
+      "r0": 0.217
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 1,
+      "hitRate": 0.25,
+      "testOnsets": 1,
+      "precision": 1,
+      "medianMs": -133,
+      "medianAbsMs": 133
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 5,
+      "hitRate": 0.714,
+      "testOnsets": 6,
+      "precision": 1,
+      "medianMs": 67,
+      "medianAbsMs": 100
+     }
+    },
+    "Cl": {
+     "classes": {
+      "agree": 0.656,
+      "chance": 0.423,
+      "kappa": 0.405,
+      "frames": 131
+     },
+     "openingLag": {
+      "r": 1,
+      "lagMs": -50,
+      "r0": 0.749
+     },
+     "closedOnsets": {
+      "onsets": 4,
+      "matched": 4,
+      "hitRate": 1,
+      "testOnsets": 4,
+      "precision": 1,
+      "medianMs": -50,
+      "medianAbsMs": 50
+     },
+     "roundedOnsets": {
+      "onsets": 7,
+      "matched": 7,
+      "hitRate": 1,
+      "testOnsets": 7,
+      "precision": 1,
+      "medianMs": -50,
+      "medianAbsMs": 50
+     }
+    }
+   }
+  },
+  "imani_en_t": {
+   "lang": "en",
+   "seconds": 3.79,
+   "speakingS": 2.43,
+   "A": {
+    "r": 0.93,
+    "lagMs": 17,
+    "r0": 0.876,
+    "eventsPerS": 5.3,
+    "openSpeaking": 0.478,
+    "openSilent": 0.068,
+    "visemes": {
+     "aa": 0.59,
+     "sil": 0.41
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.848,
+    "lagMs": 33,
+    "r0": 0.713,
+    "eventsPerS": 8.2,
+    "openSpeaking": 0.246,
+    "openSilent": 0.023,
+    "visemes": {
+     "sil": 0.542,
+     "I": 0.251,
+     "O": 0.145,
+     "aa": 0.026,
+     "nn": 0.022,
+     "PP": 0.013
+    },
+    "loudClosed": 0.189,
+    "nodeUsPerFrame": 12.9
+   },
+   "Bq": {
+    "r": 0.824,
+    "lagMs": 33,
+    "r0": 0.636,
+    "eventsPerS": 4.8,
+    "openSpeaking": 0.064,
+    "openSilent": 0.004,
+    "visemes": {
+     "sil": 0.797,
+     "I": 0.163,
+     "nn": 0.031,
+     "O": 0.009
+    },
+    "loudClosed": 0.297
+   },
+   "H": {
+    "r": 0.422,
+    "lagMs": 200,
+    "r0": 0.13,
+    "eventsPerS": 6.3,
+    "openSpeaking": 0.218,
+    "openSilent": 0.126,
+    "visemes": {
+     "sil": 0.22,
+     "RR": 0.198,
+     "FF": 0.115,
+     "SS": 0.11,
+     "E": 0.097,
+     "U": 0.07,
+     "I": 0.07,
+     "nn": 0.044,
+     "PP": 0.04,
+     "O": 0.035
+    },
+    "loudClosed": 0.514,
+    "nodeUsPerFrame": 49.3
+   },
+   "Hw": {
+    "r": 0.377,
+    "lagMs": 100,
+    "r0": 0.217,
+    "eventsPerS": 6.6,
+    "openSpeaking": 0.23,
+    "openSilent": 0.132,
+    "visemes": {
+     "sil": 0.238,
+     "E": 0.145,
+     "FF": 0.141,
+     "SS": 0.128,
+     "I": 0.106,
+     "RR": 0.084,
+     "CH": 0.079,
+     "kk": 0.035,
+     "U": 0.035,
+     "O": 0.009
+    },
+    "loudClosed": 0.27
+   },
+   "text": "Hi, I'm Imani. What would you like to understand today?",
+   "C": {
+    "r": 0.445,
+    "lagMs": -17,
+    "r0": 0.426,
+    "eventsPerS": 10.3,
+    "openSpeaking": 0.356,
+    "openSilent": 0.119,
+    "visemes": {
+     "sil": 0.361,
+     "DD": 0.154,
+     "aa": 0.097,
+     "I": 0.097,
+     "U": 0.057,
+     "nn": 0.053,
+     "PP": 0.048,
+     "O": 0.044,
+     "E": 0.031,
+     "kk": 0.022,
+     "RR": 0.022,
+     "SS": 0.013
+    },
+    "cues": 39,
+    "loudClosed": 0.108
+   },
+   "C0": {
+    "r": 0.271,
+    "lagMs": 33,
+    "r0": 0.17,
+    "eventsPerS": 10.3,
+    "openSpeaking": 0.36,
+    "openSilent": 0.236,
+    "visemes": {
+     "sil": 0.256,
+     "DD": 0.185,
+     "aa": 0.101,
+     "U": 0.093,
+     "I": 0.088,
+     "O": 0.07,
+     "nn": 0.053,
+     "PP": 0.04,
+     "kk": 0.035,
+     "E": 0.031,
+     "RR": 0.026,
+     "SS": 0.022
+    }
+   },
+   "Cl": {
+    "r": 0.436,
+    "lagMs": -67,
+    "r0": 0.342,
+    "eventsPerS": 10.3,
+    "openSpeaking": 0.339,
+    "openSilent": 0.149,
+    "visemes": {
+     "sil": 0.361,
+     "DD": 0.154,
+     "aa": 0.097,
+     "I": 0.097,
+     "U": 0.057,
+     "nn": 0.053,
+     "PP": 0.048,
+     "O": 0.044,
+     "E": 0.031,
+     "kk": 0.022,
+     "RR": 0.022,
+     "SS": 0.013
+    },
+    "leadMs": 50
+   },
+   "vsC": {
+    "A": {
+     "classes": {
+      "agree": 0.699,
+      "chance": 0.701,
+      "kappa": -0.008,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 0.473,
+      "lagMs": 50,
+      "r0": 0.422
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 2,
+      "hitRate": 1,
+      "testOnsets": 2,
+      "precision": 1,
+      "medianMs": 133,
+      "medianAbsMs": 133
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 0,
+      "precision": null,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     }
+    },
+    "B": {
+     "classes": {
+      "agree": 0.473,
+      "chance": 0.464,
+      "kappa": 0.016,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 0.377,
+      "lagMs": 67,
+      "r0": 0.312
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 2,
+      "hitRate": 1,
+      "testOnsets": 6,
+      "precision": 0.333,
+      "medianMs": 50,
+      "medianAbsMs": 67
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 3,
+      "hitRate": 0.5,
+      "testOnsets": 6,
+      "precision": 0.5,
+      "medianMs": 50,
+      "medianAbsMs": 100
+     }
+    },
+    "Bq": {
+     "classes": {
+      "agree": 0.274,
+      "chance": 0.265,
+      "kappa": 0.012,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 0.287,
+      "lagMs": 50,
+      "r0": 0.241
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 2,
+      "hitRate": 1,
+      "testOnsets": 6,
+      "precision": 0.333,
+      "medianMs": -17,
+      "medianAbsMs": 183
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 0,
+      "precision": null,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     }
+    },
+    "H": {
+     "classes": {
+      "agree": 0.479,
+      "chance": 0.357,
+      "kappa": 0.19,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 0.441,
+      "lagMs": 200,
+      "r0": 0.19
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 1,
+      "hitRate": 0.5,
+      "testOnsets": 2,
+      "precision": 0.5,
+      "medianMs": 133,
+      "medianAbsMs": 133
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 5,
+      "hitRate": 0.833,
+      "testOnsets": 7,
+      "precision": 0.571,
+      "medianMs": -33,
+      "medianAbsMs": 33
+     }
+    },
+    "Hw": {
+     "classes": {
+      "agree": 0.548,
+      "chance": 0.447,
+      "kappa": 0.183,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 0.339,
+      "lagMs": 250,
+      "r0": 0.239
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 0,
+      "hitRate": 0,
+      "testOnsets": 2,
+      "precision": 0,
+      "medianMs": 0,
+      "medianAbsMs": 0
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 4,
+      "hitRate": 0.667,
+      "testOnsets": 5,
+      "precision": 0.6,
+      "medianMs": 33,
+      "medianAbsMs": 33
+     }
+    },
+    "C0": {
+     "classes": {
+      "agree": 0.603,
+      "chance": 0.523,
+      "kappa": 0.168,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 0.28,
+      "lagMs": 167,
+      "r0": -0.01
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 1,
+      "hitRate": 0.5,
+      "testOnsets": 3,
+      "precision": 0.333,
+      "medianMs": -83,
+      "medianAbsMs": 83
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 3,
+      "hitRate": 0.5,
+      "testOnsets": 5,
+      "precision": 0.6,
+      "medianMs": 0,
+      "medianAbsMs": 33
+     }
+    },
+    "Cl": {
+     "classes": {
+      "agree": 0.733,
+      "chance": 0.566,
+      "kappa": 0.384,
+      "frames": 146
+     },
+     "openingLag": {
+      "r": 1,
+      "lagMs": -50,
+      "r0": 0.704
+     },
+     "closedOnsets": {
+      "onsets": 2,
+      "matched": 2,
+      "hitRate": 1,
+      "testOnsets": 3,
+      "precision": 0.667,
+      "medianMs": -50,
+      "medianAbsMs": 50
+     },
+     "roundedOnsets": {
+      "onsets": 6,
+      "matched": 6,
+      "hitRate": 1,
+      "testOnsets": 6,
+      "precision": 1,
+      "medianMs": -50,
+      "medianAbsMs": 50
+     }
+    }
+   }
+  },
+  "nova-es": {
+   "lang": "es",
+   "seconds": 4.88,
+   "speakingS": 3.33,
+   "A": {
+    "r": 0.914,
+    "lagMs": 17,
+    "r0": 0.835,
+    "eventsPerS": 6.2,
+    "openSpeaking": 0.542,
+    "openSilent": 0.166,
+    "visemes": {
+     "aa": 0.654,
+     "sil": 0.346
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.176,
+    "lagMs": 250,
+    "r0": 0.09,
+    "eventsPerS": 11.5,
+    "openSpeaking": 0.182,
+    "openSilent": 0.086,
+    "visemes": {
+     "sil": 0.373,
+     "PP": 0.257,
+     "I": 0.236,
+     "O": 0.062,
+     "aa": 0.038,
+     "E": 0.021,
+     "DD": 0.014
+    },
+    "loudClosed": 0.68,
+    "nodeUsPerFrame": 12
+   },
+   "Bq": {
+    "r": 0.761,
+    "lagMs": 33,
+    "r0": 0.623,
+    "eventsPerS": 7.8,
+    "openSpeaking": 0.176,
+    "openSilent": 0.039,
+    "visemes": {
+     "sil": 0.551,
+     "I": 0.373,
+     "aa": 0.034,
+     "PP": 0.027,
+     "E": 0.014
+    },
+    "loudClosed": 0.08
+   },
+   "H": {
+    "r": 0.043,
+    "lagMs": 233,
+    "r0": -0.224,
+    "eventsPerS": 7,
+    "openSpeaking": 0.191,
+    "openSilent": 0.206,
+    "visemes": {
+     "CH": 0.271,
+     "DD": 0.164,
+     "kk": 0.147,
+     "PP": 0.12,
+     "sil": 0.075,
+     "SS": 0.055,
+     "RR": 0.034,
+     "U": 0.031,
+     "TH": 0.027,
+     "FF": 0.027,
+     "aa": 0.027,
+     "nn": 0.014,
+     "O": 0.007
+    },
+    "loudClosed": 0.26,
+    "nodeUsPerFrame": 49.4
+   },
+   "Hw": {
+    "r": 0.456,
+    "lagMs": 67,
+    "r0": 0.27,
+    "eventsPerS": 7,
+    "openSpeaking": 0.187,
+    "openSilent": 0.139,
+    "visemes": {
+     "kk": 0.243,
+     "CH": 0.24,
+     "SS": 0.14,
+     "DD": 0.096,
+     "PP": 0.092,
+     "FF": 0.079,
+     "sil": 0.062,
+     "RR": 0.027,
+     "I": 0.021
+    },
+    "loudClosed": 0.16
+   }
+  },
+  "hana-es": {
+   "lang": "es",
+   "seconds": 5.12,
+   "speakingS": 2.05,
+   "A": {
+    "r": 0.823,
+    "lagMs": 17,
+    "r0": 0.785,
+    "eventsPerS": 9.4,
+    "openSpeaking": 0.498,
+    "openSilent": 0.16,
+    "visemes": {
+     "aa": 0.609,
+     "sil": 0.391
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.409,
+    "lagMs": 133,
+    "r0": 0.226,
+    "eventsPerS": 7.4,
+    "openSpeaking": 0.125,
+    "openSilent": 0.032,
+    "visemes": {
+     "sil": 0.625,
+     "I": 0.179,
+     "PP": 0.114,
+     "O": 0.039,
+     "nn": 0.036,
+     "E": 0.007
+    },
+    "loudClosed": 0.774,
+    "nodeUsPerFrame": 12.1
+   },
+   "Bq": {
+    "r": 0.908,
+    "lagMs": 17,
+    "r0": 0.86,
+    "eventsPerS": 3.5,
+    "openSpeaking": 0.226,
+    "openSilent": 0.013,
+    "visemes": {
+     "sil": 0.857,
+     "aa": 0.072,
+     "O": 0.033,
+     "I": 0.029,
+     "PP": 0.01
+    },
+    "loudClosed": 0.032
+   },
+   "H": {
+    "r": 0.482,
+    "lagMs": 150,
+    "r0": 0.206,
+    "eventsPerS": 5.7,
+    "openSpeaking": 0.215,
+    "openSilent": 0.147,
+    "visemes": {
+     "CH": 0.336,
+     "sil": 0.176,
+     "DD": 0.134,
+     "PP": 0.085,
+     "kk": 0.078,
+     "RR": 0.055,
+     "nn": 0.052,
+     "E": 0.033,
+     "I": 0.026,
+     "TH": 0.026
+    },
+    "loudClosed": 0.097,
+    "nodeUsPerFrame": 47.9
+   },
+   "Hw": {
+    "r": 0.568,
+    "lagMs": 250,
+    "r0": 0.389,
+    "eventsPerS": 5.3,
+    "openSpeaking": 0.245,
+    "openSilent": 0.151,
+    "visemes": {
+     "CH": 0.326,
+     "sil": 0.173,
+     "DD": 0.13,
+     "PP": 0.124,
+     "I": 0.078,
+     "E": 0.052,
+     "kk": 0.036,
+     "RR": 0.029,
+     "nn": 0.026,
+     "O": 0.026
+    },
+    "loudClosed": 0.097
+   }
+  },
+  "imani-es": {
+   "lang": "es",
+   "seconds": 4,
+   "speakingS": 2.75,
+   "A": {
+    "r": 0.937,
+    "lagMs": 17,
+    "r0": 0.888,
+    "eventsPerS": 3,
+    "openSpeaking": 0.668,
+    "openSilent": 0.077,
+    "visemes": {
+     "aa": 0.667,
+     "sil": 0.333
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.196,
+    "lagMs": 233,
+    "r0": 0.193,
+    "eventsPerS": 9.8,
+    "openSpeaking": 0.23,
+    "openSilent": 0.053,
+    "visemes": {
+     "sil": 0.35,
+     "PP": 0.342,
+     "O": 0.138,
+     "I": 0.071,
+     "aa": 0.05,
+     "nn": 0.042,
+     "E": 0.008
+    },
+    "loudClosed": 0.619,
+    "nodeUsPerFrame": 11.9
+   },
+   "Bq": {
+    "r": 0.915,
+    "lagMs": 33,
+    "r0": 0.795,
+    "eventsPerS": 8.5,
+    "openSpeaking": 0.348,
+    "openSilent": 0.025,
+    "visemes": {
+     "sil": 0.429,
+     "O": 0.296,
+     "I": 0.15,
+     "nn": 0.075,
+     "aa": 0.042,
+     "PP": 0.008
+    },
+    "loudClosed": 0
+   },
+   "H": {
+    "r": 0.273,
+    "lagMs": 50,
+    "r0": 0.252,
+    "eventsPerS": 7.3,
+    "openSpeaking": 0.276,
+    "openSilent": 0.184,
+    "visemes": {
+     "sil": 0.154,
+     "FF": 0.133,
+     "I": 0.104,
+     "kk": 0.1,
+     "CH": 0.092,
+     "SS": 0.092,
+     "O": 0.071,
+     "RR": 0.067,
+     "DD": 0.067,
+     "aa": 0.054,
+     "PP": 0.033,
+     "E": 0.033
+    },
+    "loudClosed": 0.095,
+    "nodeUsPerFrame": 47.7
+   },
+   "Hw": {
+    "r": 0.291,
+    "lagMs": 67,
+    "r0": 0.252,
+    "eventsPerS": 7.3,
+    "openSpeaking": 0.281,
+    "openSilent": 0.145,
+    "visemes": {
+     "DD": 0.142,
+     "sil": 0.125,
+     "CH": 0.121,
+     "nn": 0.1,
+     "SS": 0.071,
+     "O": 0.067,
+     "kk": 0.067,
+     "I": 0.067,
+     "U": 0.067,
+     "RR": 0.067,
+     "PP": 0.038,
+     "aa": 0.038,
+     "FF": 0.033
+    },
+    "loudClosed": 0.143
+   }
+  },
+  "kai-es": {
+   "lang": "es",
+   "seconds": 4.48,
+   "speakingS": 3.15,
+   "A": {
+    "r": 0.882,
+    "lagMs": 17,
+    "r0": 0.82,
+    "eventsPerS": 3.6,
+    "openSpeaking": 0.59,
+    "openSilent": 0.104,
+    "visemes": {
+     "aa": 0.69,
+     "sil": 0.31
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.41,
+    "lagMs": 233,
+    "r0": 0.296,
+    "eventsPerS": 11.4,
+    "openSpeaking": 0.236,
+    "openSilent": 0.06,
+    "visemes": {
+     "sil": 0.313,
+     "I": 0.287,
+     "PP": 0.239,
+     "O": 0.078,
+     "E": 0.045,
+     "aa": 0.037
+    },
+    "loudClosed": 0.292,
+    "nodeUsPerFrame": 11.7
+   },
+   "Bq": {
+    "r": 0.766,
+    "lagMs": 33,
+    "r0": 0.598,
+    "eventsPerS": 8.5,
+    "openSpeaking": 0.195,
+    "openSilent": 0.024,
+    "visemes": {
+     "sil": 0.466,
+     "I": 0.437,
+     "O": 0.067,
+     "PP": 0.015,
+     "E": 0.007,
+     "aa": 0.007
+    },
+    "loudClosed": 0.146
+   },
+   "H": {
+    "r": 0.124,
+    "lagMs": 50,
+    "r0": 0.03,
+    "eventsPerS": 6.5,
+    "openSpeaking": 0.267,
+    "openSilent": 0.271,
+    "visemes": {
+     "kk": 0.343,
+     "I": 0.183,
+     "E": 0.131,
+     "sil": 0.093,
+     "SS": 0.063,
+     "CH": 0.06,
+     "PP": 0.06,
+     "RR": 0.03,
+     "nn": 0.03,
+     "TH": 0.007
+    },
+    "loudClosed": 0.083,
+    "nodeUsPerFrame": 47.7
+   },
+   "Hw": {
+    "r": 0.167,
+    "lagMs": 167,
+    "r0": 0.012,
+    "eventsPerS": 6.7,
+    "openSpeaking": 0.287,
+    "openSilent": 0.247,
+    "visemes": {
+     "kk": 0.272,
+     "I": 0.134,
+     "E": 0.108,
+     "RR": 0.09,
+     "CH": 0.09,
+     "sil": 0.078,
+     "PP": 0.071,
+     "SS": 0.063,
+     "TH": 0.034,
+     "DD": 0.03,
+     "aa": 0.03
+    },
+    "loudClosed": 0.083
+   }
+  },
+  "nova-en": {
+   "lang": "en",
+   "seconds": 4.64,
+   "speakingS": 2.95,
+   "A": {
+    "r": 0.924,
+    "lagMs": 17,
+    "r0": 0.844,
+    "eventsPerS": 7.3,
+    "openSpeaking": 0.568,
+    "openSilent": 0.158,
+    "visemes": {
+     "aa": 0.615,
+     "sil": 0.385
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.404,
+    "lagMs": 33,
+    "r0": 0.36,
+    "eventsPerS": 13.4,
+    "openSpeaking": 0.257,
+    "openSilent": 0.081,
+    "visemes": {
+     "sil": 0.435,
+     "I": 0.176,
+     "PP": 0.169,
+     "aa": 0.083,
+     "O": 0.061,
+     "DD": 0.058,
+     "nn": 0.011,
+     "E": 0.007
+    },
+    "loudClosed": 0.2,
+    "nodeUsPerFrame": 11.5
+   },
+   "Bq": {
+    "r": 0.889,
+    "lagMs": 33,
+    "r0": 0.706,
+    "eventsPerS": 8.6,
+    "openSpeaking": 0.222,
+    "openSilent": 0.047,
+    "visemes": {
+     "sil": 0.586,
+     "I": 0.252,
+     "O": 0.068,
+     "E": 0.047,
+     "aa": 0.032,
+     "DD": 0.007,
+     "nn": 0.007
+    },
+    "loudClosed": 0.022
+   },
+   "H": {
+    "r": 0.214,
+    "lagMs": 100,
+    "r0": -0.006,
+    "eventsPerS": 6.7,
+    "openSpeaking": 0.162,
+    "openSilent": 0.164,
+    "visemes": {
+     "CH": 0.252,
+     "SS": 0.162,
+     "DD": 0.155,
+     "kk": 0.126,
+     "sil": 0.097,
+     "FF": 0.086,
+     "RR": 0.065,
+     "nn": 0.029,
+     "PP": 0.029
+    },
+    "loudClosed": 0.156,
+    "nodeUsPerFrame": 47.4
+   },
+   "Hw": {
+    "r": 0.261,
+    "lagMs": 100,
+    "r0": 0.02,
+    "eventsPerS": 6.9,
+    "openSpeaking": 0.224,
+    "openSilent": 0.19,
+    "visemes": {
+     "CH": 0.324,
+     "kk": 0.144,
+     "SS": 0.119,
+     "FF": 0.115,
+     "sil": 0.083,
+     "RR": 0.058,
+     "U": 0.032,
+     "aa": 0.032,
+     "DD": 0.029,
+     "O": 0.029,
+     "I": 0.022,
+     "E": 0.014
+    },
+    "loudClosed": 0.044
+   }
+  },
+  "hana-en": {
+   "lang": "en",
+   "seconds": 5.12,
+   "speakingS": 3.1,
+   "A": {
+    "r": 0.853,
+    "lagMs": 17,
+    "r0": 0.826,
+    "eventsPerS": 3.5,
+    "openSpeaking": 0.575,
+    "openSilent": 0.139,
+    "visemes": {
+     "aa": 0.73,
+     "sil": 0.27
+    },
+    "loudClosed": 0
+   },
+   "B": {
+    "r": 0.298,
+    "lagMs": -17,
+    "r0": 0.292,
+    "eventsPerS": 8.6,
+    "openSpeaking": 0.217,
+    "openSilent": 0.028,
+    "visemes": {
+     "sil": 0.443,
+     "I": 0.238,
+     "PP": 0.147,
+     "O": 0.078,
+     "E": 0.049,
+     "nn": 0.026,
+     "aa": 0.013,
+     "DD": 0.007
+    },
+    "loudClosed": 0.511,
+    "nodeUsPerFrame": 11.9
+   },
+   "Bq": {
+    "r": 0.901,
+    "lagMs": 33,
+    "r0": 0.835,
+    "eventsPerS": 7.2,
+    "openSpeaking": 0.205,
+    "openSilent": 0.005,
+    "visemes": {
+     "sil": 0.694,
+     "I": 0.156,
+     "O": 0.068,
+     "aa": 0.046,
+     "PP": 0.016,
+     "nn": 0.013,
+     "E": 0.007
+    },
+    "loudClosed": 0
+   },
+   "H": {
+    "r": 0.244,
+    "lagMs": 83,
+    "r0": 0.212,
+    "eventsPerS": 6.4,
+    "openSpeaking": 0.204,
+    "openSilent": 0.142,
+    "visemes": {
+     "CH": 0.274,
+     "DD": 0.182,
+     "sil": 0.179,
+     "kk": 0.13,
+     "PP": 0.104,
+     "RR": 0.052,
+     "I": 0.026,
+     "nn": 0.026,
+     "E": 0.026
+    },
+    "loudClosed": 0,
+    "nodeUsPerFrame": 47.7
+   },
+   "Hw": {
+    "r": -0.027,
+    "lagMs": 0,
+    "r0": -0.027,
+    "eventsPerS": 6.3,
+    "openSpeaking": 0.231,
+    "openSilent": 0.167,
+    "visemes": {
+     "CH": 0.254,
+     "DD": 0.163,
+     "sil": 0.147,
+     "PP": 0.124,
+     "kk": 0.104,
+     "U": 0.052,
+     "SS": 0.052,
+     "E": 0.052,
+     "aa": 0.026,
+     "I": 0.026
+    },
+    "loudClosed": 0.255
+   }
+  }
+ }
+}

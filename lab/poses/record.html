@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sesión de poses</title>
+<style>
+  :root { --bg: #0e0e0d; --card: #181816; --line: #2c2c29; --fg: #f2f1ec; --muted: #9b9a93; --accent: #d93f22; --ok: #3f9d5c; --warn: #d0a43a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 1.5rem; margin: 0; letter-spacing: -0.01em; }
+  input { background: var(--card); border: 1px solid var(--line); color: var(--fg); border-radius: 999px; padding: 9px 14px; font: inherit; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; }
+  .step { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); background: none; cursor: pointer; }
+  .step[aria-current="true"] { color: var(--fg); border-color: var(--fg); }
+  .step.done::before { content: "✓ "; color: var(--ok); }
+  .grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .demo video { width: 100%; aspect-ratio: 480 / 704; object-fit: cover; border-radius: 14px; background: #000; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .line { border: 1px dashed var(--line); border-radius: 14px; padding: 12px; color: var(--fg); }
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #000; }
+  .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #cam { transform: scaleX(-1); }
+  .crop { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); aspect-ratio: 480 / 704; border: 2px solid rgba(255,255,255,0.55); box-shadow: 0 0 0 9999px rgba(0,0,0,0.35); border-radius: 8px; pointer-events: none; }
+  .oval { position: absolute; left: 50%; top: 33%; width: 46%; aspect-ratio: 3 / 4; transform: translate(-50%, -50%); border: 2px dashed rgba(255,255,255,0.4); border-radius: 50%; }
+  .count { position: absolute; inset: 0; display: grid; place-items: center; font-size: 120px; font-weight: 700; color: #fff; text-shadow: 0 4px 30px rgba(0,0,0,0.6); pointer-events: none; }
+  .rec { position: absolute; left: 12px; top: 12px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.55); padding: 6px 12px; border-radius: 999px; font-size: 13px; }
+  .rec i { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .bar { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); width: 0; }
+  .live { position: absolute; right: 12px; top: 12px; display: flex; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; font-size: 13px; background: rgba(0,0,0,0.5); }
+  .chip.ok { border-color: var(--ok); } .chip.warn { border-color: var(--warn); } .chip.bad { border-color: var(--accent); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.btn { border: 0; border-radius: 999px; padding: 11px 20px; font: 600 15px system-ui; cursor: pointer; }
+  .primary { background: var(--accent); color: #fff; } .ghost { background: none; color: var(--fg); border: 1px solid var(--line) !important; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .checks { display: flex; gap: 6px; flex-wrap: wrap; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .done-all { text-align: center; padding: 32px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sesión de poses</h1>
+    <label class="muted">Nombre (para la carpeta) <input id="name" value="marcelo" maxlength="40" pattern="[a-z0-9_-]+"></label>
+  </header>
+  <nav class="steps" id="steps" aria-label="Poses"></nav>
+
+  <div class="grid" id="session">
+    <section class="card demo">
+      <span class="label">Mira cómo lo hace Jin</span>
+      <video id="demo" muted loop playsinline autoplay></video>
+      <strong id="title"></strong>
+      <span id="how" class="muted"></span>
+    </section>
+
+    <section class="card">
+      <div class="stage">
+        <video id="cam" muted playsinline autoplay></video>
+        <video id="review" playsinline controls style="display:none"></video>
+        <div class="crop" id="crop"><div class="oval"></div></div>
+        <div class="live" id="live"></div>
+        <div class="count" id="count"></div>
+        <div class="rec" id="rec" style="display:none"><i></i><span id="left"></span></div>
+        <div class="bar" id="bar"></div>
+      </div>
+      <div id="sayBox" style="display:none"><span class="label">Dilo en voz alta</span><div class="line" id="say"></div></div>
+      <div class="checks" id="checks"></div>
+      <div class="actions" id="actions"></div>
+      <p class="muted" id="hint">Mantén la cabeza y las dos manos dentro del recuadro claro. Luz de frente, fondo tranquilo. La cámara queda fija.</p>
+    </section>
+  </div>
+  <section class="card done-all" id="finished" style="display:none">
+    <h2>Listo: cinco tomas guardadas</h2>
+    <p class="muted">Están en <code id="where"></code>. El siguiente paso es <code>prepare.py</code>.</p>
+  </section>
+</main>
+
+<script type="module">
+// The five moments of a call, the same names the gesture layer and LiveTalking's body states use.
+// Speaking takes carry a line to say (the live face engine repaints the mouth later; the hands follow the speech).
+// "explain" is long on purpose: its audio doubles as the sample for cloning the voice.
+const POSES = [
+  { id: "listen", title: "1 · Escuchar", seconds: 8, silent: true,
+    how: "Escuchas a alguien en una videollamada: asientes despacio, sonrisa suave con la boca cerrada, manos relajadas delante." },
+  { id: "greet", title: "2 · Saludar", seconds: 5,
+    how: "Saludas con una mano a la altura del pecho, sonríes y juntas las manos al final.",
+    say: (n) => `¡Hola! Soy ${n}. ¿Qué tal? Cuéntame, ¿en qué te ayudo?` },
+  { id: "explain", title: "3 · Explicar (y tu voz)", seconds: 30, minSeconds: 15,
+    how: "Explicas con calma, con las manos abiertas delante del pecho siguiendo el ritmo de lo que dices. Lee el texto entero: también sirve para clonar tu voz.",
+    say: (n) => `Hola, soy ${n}. Gracias por pasar. Me encanta conversar sobre lo que hago y ayudarte con lo que necesites. Llevo años trabajando en esto y cada día aprendo algo nuevo. Pregúntame lo que quieras sobre mi trabajo y te cuento lo que sé, y si te sirve, también cómo empecé. ¡Tengo ganas de hablar contigo!` },
+  { id: "emphasis", title: "4 · Enfatizar", seconds: 8,
+    how: "Cuentas con los dedos uno, dos, tres; te inclinas un poco hacia la cámara en la palabra clave y terminas con las palmas abiertas.",
+    say: () => "Tres cosas: primero, la idea. Segundo, el equipo. Y tercero, ojo, ¡el momento! Eso es lo importante." },
+  { id: "think", title: "5 · Pensar", seconds: 6, silent: true,
+    how: "Piensas antes de responder: miras arriba y a un lado, te tocas la barbilla una vez y vuelves a mirar a la cámara con un pequeño gesto de asentir." },
+];
+
+const $ = (id) => document.getElementById(id);
+const cam = $("cam"), review = $("review"), demo = $("demo");
+let stream, recorder, landmarker, idx = 0, take = null, busy = false;
+const done = new Set();
+const nameOf = () => ($("name").value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") || "persona");
+const pretty = () => { const n = nameOf(); return n.charAt(0).toUpperCase() + n.slice(1); };
+
+// -- Live checks: face in the box, light, closed lips when silent (MediaPipe Face Landmarker, local model) ---------------
+async function loadLandmarker() {
+  try {
+    const { FaceLandmarker, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+    const files = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+    landmarker = await FaceLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: "/model/face_landmarker.task" }, runningMode: "VIDEO", numFaces: 1 });
+  } catch (e) { console.warn("face checks off:", e); }
+}
+const probe = document.createElement("canvas"); probe.width = 160; probe.height = 90;
+const pctx = probe.getContext("2d", { willReadFrequently: true });
+function sample() {
+  const w = cam.videoWidth, h = cam.videoHeight;
+  if (!w) return null;
+  const out = { face: false, inBox: false, size: 0, light: 0, mouth: 0 };
+  let box = { x0: 0.3, x1: 0.7, y0: 0.15, y1: 0.6 };
+  if (landmarker) {
+    const r = landmarker.detectForVideo(cam, performance.now());
+    const lm = r.faceLandmarks?.[0];
+    if (lm) {
+      const xs = lm.map((p) => p.x), ys = lm.map((p) => p.y);
+      box = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+      const cx = (box.x0 + box.x1) / 2, fh = box.y1 - box.y0;
+      const cropW = (h * 480 / 704) / w; // the portrait crop, centred
+      out.face = true;
+      out.size = fh;
+      out.inBox = Math.abs(cx - 0.5) < cropW / 2 - (box.x1 - box.x0) / 2 && box.y0 > 0.02 && box.y1 < 0.75;
+      out.mouth = Math.hypot(lm[13].x - lm[14].x, lm[13].y - lm[14].y) / fh;
+    }
+  }
+  pctx.drawImage(cam, 0, 0, 160, 90);
+  const px = pctx.getImageData(Math.floor(box.x0 * 160), Math.floor(box.y0 * 90), Math.max(1, Math.floor((box.x1 - box.x0) * 160)), Math.max(1, Math.floor((box.y1 - box.y0) * 90))).data;
+  let s = 0; for (let i = 0; i < px.length; i += 4) s += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+  out.light = s / (px.length / 4);
+  return out;
+}
+const chip = (label, state) => `<span class="chip ${state}">${label}</span>`;
+function liveChips(s) {
+  if (!s) return "";
+  return [
+    landmarker ? chip(s.face ? (s.inBox ? "Cara en el recuadro" : "Céntrate") : "No veo tu cara", s.face && s.inBox ? "ok" : "bad") : "",
+    landmarker && s.face ? chip(s.size < 0.16 ? "Acércate un poco" : s.size > 0.42 ? "Aléjate un poco" : "Distancia bien", s.size < 0.16 || s.size > 0.42 ? "warn" : "ok") : "",
+    chip(s.light < 70 ? "Poca luz" : s.light > 225 ? "Demasiada luz" : "Luz bien", s.light < 70 || s.light > 225 ? "warn" : "ok"),
+  ].join("");
+}
+let samples = [];
+function loop() {
+  if (cam.readyState >= 2 && !review.src) {
+    const s = sample();
+    $("live").innerHTML = liveChips(s);
+    if (recorder?.state === "recording" && s) samples.push(s);
+  }
+  setTimeout(loop, 200);
+}
+function summarise(pose) {
+  const n = samples.length || 1;
+  const face = samples.filter((s) => s.face).length / n;
+  const inBox = samples.filter((s) => s.inBox).length / n;
+  const light = samples.reduce((a, s) => a + s.light, 0) / n;
+  const open = samples.filter((s) => s.mouth > 0.06).length / n;
+  const c = { face: +face.toFixed(2), inBox: +inBox.toFixed(2), light: Math.round(light), mouthOpen: +open.toFixed(2), seconds: take?.seconds ?? 0 };
+  const rows = [];
+  if (landmarker) {
+    rows.push(chip(`Cara visible ${Math.round(face * 100)} %`, face > 0.9 ? "ok" : face > 0.7 ? "warn" : "bad"));
+    rows.push(chip(`Dentro del recuadro ${Math.round(inBox * 100)} %`, inBox > 0.85 ? "ok" : inBox > 0.6 ? "warn" : "bad"));
+    if (pose.silent) rows.push(chip(open < 0.1 ? "Boca cerrada" : `Boca abierta ${Math.round(open * 100)} %`, open < 0.1 ? "ok" : open < 0.25 ? "warn" : "bad"));
+  }
+  rows.push(chip(`Luz ${c.light}`, light >= 70 && light <= 225 ? "ok" : "warn"));
+  if (pose.minSeconds) rows.push(chip(`${c.seconds} s de voz`, c.seconds >= pose.minSeconds ? "ok" : "bad"));
+  return { c, html: rows.join("") };
+}
+
+// -- The session -----------------------------------------------------------------------------------------------------
+function render() {
+  const pose = POSES[idx];
+  $("steps").innerHTML = POSES.map((p, i) => `<button class="step ${done.has(p.id) ? "done" : ""}" aria-current="${i === idx}" data-i="${i}">${p.title}</button>`).join("");
+  $("steps").querySelectorAll("button").forEach((b) => b.onclick = () => { if (!busy) { idx = +b.dataset.i; reset(); render(); } });
+  $("title").textContent = pose.title;
+  $("how").textContent = pose.how;
+  if (!demo.src.endsWith(`/demo/${pose.id}.mp4`)) demo.src = `/demo/${pose.id}.mp4`;
+  $("sayBox").style.display = pose.say ? "" : "none";
+  if (pose.say) $("say").textContent = pose.say(pretty());
+  const a = $("actions");
+  if (take) {
+    a.innerHTML = `<button class="btn ghost" id="again">Repetir</button><button class="btn primary" id="keep">Guardar y seguir</button>`;
+    $("again").onclick = () => { reset(); render(); };
+    $("keep").onclick = save;
+  } else {
+    a.innerHTML = `<button class="btn primary" id="go" ${busy ? "disabled" : ""}>Grabar · cuenta 3, 2, 1</button>`;
+    $("go").onclick = record;
+  }
+}
+function reset() {
+  take = null; samples = [];
+  review.pause(); review.removeAttribute("src"); review.load(); review.style.display = "none"; cam.style.display = "";
+  $("checks").innerHTML = ""; $("bar").style.width = "0";
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function record() {
+  const pose = POSES[idx];
+  busy = true; render();
+  for (const n of [3, 2, 1]) { $("count").textContent = n; await sleep(900); }
+  $("count").textContent = "";
+  const type = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
+  recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8_000_000 });
+  const chunks = []; samples = [];
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  const t0 = performance.now();
+  const stopped = new Promise((r) => recorder.onstop = r);
+  recorder.start(500);
+  $("rec").style.display = "";
+  const a = $("actions");
+  if (pose.minSeconds) { a.innerHTML = `<button class="btn ghost" id="stop" disabled>Terminar</button>`; $("stop").onclick = () => recorder.stop(); }
+  else a.innerHTML = "";
+  while (recorder.state === "recording") {
+    const s = (performance.now() - t0) / 1000;
+    $("left").textContent = `${Math.max(0, Math.ceil(pose.seconds - s))} s`;
+    $("bar").style.width = `${Math.min(100, (s / pose.seconds) * 100)}%`;
+    if ($("stop")) $("stop").disabled = s < pose.minSeconds;
+    if (s >= pose.seconds) recorder.stop();
+    await sleep(100);
+  }
+  await stopped;
+  $("rec").style.display = "none";
+  const blob = new Blob(chunks, { type: recorder.mimeType });
+  if (!blob.size) { // a muted or stalled track leaves the recorder empty: say so instead of saving nothing
+    busy = false; reset(); render();
+    $("checks").innerHTML = chip("La toma salió vacía: revisa que la cámara y el micrófono estén activos y repite", "bad");
+    return;
+  }
+  take = { blob, seconds: Math.round((performance.now() - t0) / 1000) };
+  cam.style.display = "none";
+  review.src = URL.createObjectURL(blob); review.style.display = ""; review.play();
+  const sum = summarise(pose);
+  take.checks = sum.c;
+  $("checks").innerHTML = sum.html;
+  busy = false; render();
+}
+async function save() {
+  const pose = POSES[idx];
+  const name = nameOf();
+  $("keep").disabled = true; $("keep").textContent = "Guardando…";
+  const q = new URLSearchParams({ name, pose: pose.id, checks: JSON.stringify(take.checks) });
+  const r = await fetch(`/save?${q}`, { method: "POST", body: take.blob, headers: { "content-type": take.blob.type } });
+  if (!r.ok) { $("keep").textContent = "No se guardó, reintenta"; $("keep").disabled = false; return; }
+  done.add(pose.id);
+  reset();
+  const next = POSES.findIndex((p) => !done.has(p.id));
+  if (next < 0) { $("session").style.display = "none"; $("finished").style.display = ""; $("where").textContent = `lab/inputs/poses/${name}/raw/`; render(); return; }
+  idx = next; render();
+}
+
+async function start() {
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+    audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+  });
+  cam.srcObject = stream;
+  const prev = await (await fetch(`/takes?name=${nameOf()}`)).json();
+  prev.forEach((p) => done.add(p));
+  idx = Math.max(0, POSES.findIndex((p) => !done.has(p.id)));
+  render();
+  loop();
+}
+$("name").onchange = async () => { done.clear(); (await (await fetch(`/takes?name=${nameOf()}`)).json()).forEach((p) => done.add(p)); idx = Math.max(0, POSES.findIndex((p) => !done.has(p.id))); reset(); render(); };
+render();
+loadLandmarker();
+start().catch((e) => { $("hint").textContent = `No se pudo abrir la cámara: ${e.message}`; });
+</script>
+</body>
+</html>

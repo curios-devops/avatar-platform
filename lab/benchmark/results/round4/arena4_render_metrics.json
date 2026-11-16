@@ -1,0 +1,23 @@
+{
+ "threejs": {
+  "r": 0.698,
+  "lag_ms": 133,
+  "aperture_speaking": 0.0334,
+  "aperture_silent": 0.0073,
+  "aperture_p95": 0.0528
+ },
+ "a2f": {
+  "r": 0.278,
+  "lag_ms": 67,
+  "aperture_speaking": 0.0055,
+  "aperture_silent": 0.0009,
+  "aperture_p95": 0.0197
+ },
+ "a2fcal": {
+  "r": 0.6,
+  "lag_ms": 67,
+  "aperture_speaking": 0.0267,
+  "aperture_silent": 0.0049,
+  "aperture_p95": 0.0452
+ }
+}

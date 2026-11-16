@@ -5,3 +5,11 @@
 *.jpg
 *.webm
 *.pcm
+
+# Pose sessions: recordings of real people, never in git
+inputs/poses/
+
+# RunPod run state (pod ids, spend, balance): written by every run, not history
+benchmark/pod/pod_id*
+benchmark/pod/spent_*.txt
+benchmark/pod/start_balance.json

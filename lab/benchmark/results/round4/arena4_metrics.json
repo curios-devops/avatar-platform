@@ -1,0 +1,71 @@
+{
+ "threejs": {
+  "r": 0.708,
+  "lag_ms": 83,
+  "r_lag0": 0.699,
+  "jaw_mean_speaking": 0.284,
+  "jaw_mean_silent": 0.046,
+  "jaw_p95": 0.42
+ },
+ "a2f": {
+  "r": 0.694,
+  "lag_ms": -17,
+  "r_lag0": 0.677,
+  "jaw_mean_speaking": 0.162,
+  "jaw_mean_silent": 0.045,
+  "jaw_p95": 0.291
+ },
+ "frames": 1013,
+ "fps": 60,
+ "speaking_s": 8.32,
+ "a2f_active_shapes": [
+  [
+   "mouthRollLower",
+   1012
+  ],
+  [
+   "mouthClose",
+   936
+  ],
+  [
+   "browOuterUpRight",
+   767
+  ],
+  [
+   "browOuterUpLeft",
+   759
+  ],
+  [
+   "browInnerUp",
+   666
+  ],
+  [
+   "mouthPressRight",
+   649
+  ],
+  [
+   "mouthPressLeft",
+   648
+  ],
+  [
+   "jawOpen",
+   519
+  ],
+  [
+   "mouthStretchRight",
+   508
+  ],
+  [
+   "mouthShrugLower",
+   477
+  ],
+  [
+   "mouthStretchLeft",
+   474
+  ],
+  [
+   "mouthPucker",
+   463
+  ]
+ ]
+}

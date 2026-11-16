@@ -1,0 +1,31 @@
+{
+ "duration": 16.889,
+ "turns": [
+  {
+   "who": "user",
+   "t0": 0.0,
+   "t1": 3.03
+  },
+  {
+   "who": "jasom",
+   "t0": 3.38,
+   "t1": 8.665
+  },
+  {
+   "who": "user",
+   "t0": 9.015,
+   "t1": 10.672
+  },
+  {
+   "who": "jasom",
+   "t0": 11.022,
+   "t1": 16.389
+  }
+ ],
+ "lines": {
+  "u1": "Jasom, ¿qué planes tienes para este fin de semana?",
+  "j1": "Me voy a la playa al atardecer. El cielo se pone morado y naranja, y es lo mejor de toda la ciudad.",
+  "u2": "¿Y me recomiendas algún lugar?",
+  "j2": "Claro, el muelle del sur. Llega temprano, lleva algo fresco y quédate hasta que se prendan las luces."
+ }
+}

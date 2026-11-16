@@ -1,0 +1,13 @@
+[0s] start
+[cont 0s] deps + TensorRT + model downloaded (~15 min, TensorRT 6.9 GB at ~12 MB/s)
+[cont 34s] TensorRT engine built
+[cont 107s] SDK built
+No build directory exists. Please run `build.sh all` first.
+npz keys ['neutral', 'eyeBlinkLeft', 'eyeLookDownLeft', 'eyeLookInLeft', 'eyeLookOutLeft', 'eyeLookUpLeft', 'eyeSquintLeft', 'eyeWideLeft', 'eyeBlinkRight', 'eyeLookDownRight', 'eyeLookInRight', 'eyeLookOutRight', 'eyeLookUpRight', 'eyeSquintRight', 'eyeWideRight', 'jawForward', 'jawLeft', 'jawRight', 'jawOpen', 'mouthClose', 'mouthFunnel', 'mouthPucker', 'mouthLeft', 'mouthRight', 'mouthSmileLeft', 'mouthSmileRight', 'mouthFrownLeft', 'mouthFrownRight', 'mouthDimpleLeft', 'mouthDimpleRight', 'mouthStretchLeft', 'mouthStretchRight', 'mouthRollLower', 'mouthRollUpper', 'mouthShrugLower', 'mouthShrugUpper', 'mouthPressLeft', 'mouthPressRight', 'mouthLowerDownLeft', 'mouthLowerDownRight', 'mouthUpperUpLeft', 'mouthUpperUpRight', 'browDownLeft', 'browDownRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight', 'cheekPuff', 'cheekSquintLeft', 'cheekSquintRight', 'noseSneerLeft', 'noseSneerRight', 'tongueOut', 'poseNames', 'frontalMask', 'rig_version']
+name, memory.used [MiB], memory.total [MiB]
+NVIDIA GeForce RTX 3090, 1 MiB, 24576 MiB
+11G	/workspace/TensorRT-10.13.3.9
+2.2G	_data
+184M	_build
+4.6M	/workspace/sdk
+[cont 107s] done

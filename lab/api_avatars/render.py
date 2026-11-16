@@ -12,8 +12,9 @@ import httpx
 ENV = dict(l.split("=", 1) for l in pathlib.Path("/Users/mac/Documents/avatar-platform/backend/.env").read_text().splitlines()
            if "=" in l and not l.lstrip().startswith("#"))
 key = lambda k: ENV[k].strip().strip('"')
-PROMPT = ("A friendly young man in an olive green sweater talks directly to the camera in a bright home office, lips in sync "
-          "with the speech, with a relaxed, enthusiastic delivery and natural hand gestures.")
+PROMPT = __import__("os").environ.get("PRUNA_PROMPT") or (
+    "A friendly young man in an olive green sweater talks directly to the camera in a bright home office, lips in sync "
+    "with the speech, with a relaxed, enthusiastic delivery and natural hand gestures.")
 
 
 def pruna(img, wav, out):

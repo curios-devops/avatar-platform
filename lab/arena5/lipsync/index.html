@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browser lip-sync test</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<header>
+  <h1>Browser lip-sync: four methods on the same audio</h1>
+  <p class="sub">A amplitude (RMS) &middot; B lipsync-engine (audio analysis) &middot; H HeadAudio (audio, trained MFCC model) &middot; C visemes from TTS character timestamps. No GPU, no model.</p>
+  <div class="controls">
+    <label>Clip <select id="clip"></select></label>
+    <label>Mode <select id="mode">
+      <option value="file">File (whole clip decoded)</option>
+      <option value="jit">Live: stream, chunks just in time</option>
+      <option value="recorded">Live: stream, ElevenLabs arrival times</option>
+    </select></label>
+    <label>C lead <input id="lead" type="number" value="50" step="10" min="-200" max="200"> ms</label>
+    <label>B input <select id="bgain"><option value="0">0 dB (library default)</option><option value="-6">-6 dB</option></select></label>
+    <button id="play">Play</button>
+    <button id="stop" disabled>Stop</button>
+    <button id="mic" title="A, B and H on your microphone (C needs text)">Mic</button>
+  </div>
+  <p id="status" class="status">Press Play (audio needs a click first).</p>
+</header>
+<main id="panels"></main>
+<section class="results">
+  <h2>Runs</h2>
+  <p class="note">Lag: Pearson r between mouth opening and the clip's voice envelope at the best shift within &plusmn;250 ms, against the time you actually hear (output latency included); positive = mouth late. Agreement: share of voiced frames where the visible class (closed / open / rounded) matches C, with the chance level.</p>
+  <table id="runs"><thead><tr>
+    <th>clip</th><th>mode</th><th>method</th><th>r</th><th>lag ms</th><th>events/s</th><th>analysis ms (mean / p95)</th><th>draw ms</th><th>fps</th><th>AudioWorklet</th><th>agree vs C (chance)</th><th>underruns</th>
+  </tr></thead><tbody></tbody></table>
+</section>
+<section class="sheet">
+  <h2>The 15 mouth shapes</h2>
+  <div id="sheet"></div>
+</section>
+<script type="module" src="app.js"></script>
+</body>
+</html>
