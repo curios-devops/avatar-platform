@@ -1,6 +1,9 @@
 # Arena 5: a talking character that runs on the person's device (plan, 2026-11-15)
 
-Status: plan only. Nothing installed, cloned or built. Every fact in section 2 was read from the repository, model card or
+Status: plan, plus one entrant built since: the **styled portrait puppet** (section 3.1, `puppet/README.md`), now the
+primary candidate. The rest of the plan is unchanged and not built.
+
+Original status: plan only. Nothing installed, cloned or built. Every fact in section 2 was read from the repository, model card or
 page on 2026-11-15 (GitHub API, raw README and LICENSE files, Hugging Face API, npm registry); what could not be read is
 listed at the end.
 
@@ -105,18 +108,26 @@ check before it ships.
 
 ## 3. The line-up
 
-**Style: the most realistic only.** The arena's open question is local real-time talk with identity, and that is
-decided by the rig, the renderer and the lip-sync, not by the art style. A style is a head sculpt, materials and an
-expression set on top of a rig that already works. Three 3D styles would be three asset projects before we know whether
-a single one passes on an iPhone. Anime (VRM or See-through + Iki) stays LATER and is cheap to add once the bus and the
-pass bar exist.
+**Style: all three (owner's decision, 2026-11-16).** The owner chose MEYA's three visual styles for the arena, not
+"realistic only": **Animated Feature Film** (top priority, MEYA's default), **Realistic Game Character** and **Anime 3D**.
+Every entrant is judged on an original character in each style. That favours an entrant whose style is decided once, at
+creation, by an image model, over one that needs a sculpt, materials and an expression set per style (3D-A).
 
 | Slot | Entrant | What it answers |
 |---|---|---|
+| **2D-S (primary)** | **Styled portrait puppet** (built, `puppet/`): one styled portrait made once by an image model, animated in the browser by a WebGL mesh warp over MediaPipe landmarks, text-timed visemes, an inner-mouth layer, blinks, gaze, head motion and a listening state | can one image per character, in any of the three styles, talk live on the device with zero GPU and zero per-minute cost? |
 | **B0 baseline** | three.js human, `avatar-platform-human` (Anny + MakeHuman CC0, Twin fit, our engine and visemes) | the bar every entrant must beat; first iPhone numbers |
 | **3D-A** | MPFB2 (headless Blender) + CC0 visemes and face units + Twin fit ported to the MakeHuman mesh, played by **TalkingHead** | does a mature runtime (gestures, moods, eye contact) and MakeHuman's face rig beat our engine at the same cost? |
 | **2D-A** | **Photo puppet** (in-house): the portrait as a MediaPipe-meshed WebGL puppet driven by our 52 ARKit shapes | highest identity at near-zero cost: is a talking photo with ±12° of head motion good enough? |
 | **2D-R** | **Wireface 2D** (commercial yardstick, evaluated under its free Personal Licence) | how far 2D-A is from a finished product; whether GBP 50/year is worth it |
+
+### 3.1 Styled portrait puppet (primary candidate)
+
+Built and measured on 2026-11-16; results, numbers and frame sheets in `puppet/README.md`. It is 2D-A with two changes:
+the portrait is a **styled** image of the character (Z-Image-Turbo locally for the lab; for a person's own photo an
+image-edit model once at creation, see the README), and the mouth interior is solved explicitly (a drawn inner mouth
+layer, compared with image-to-image mouth sprites). It reuses the lip-sync test's `mouth-driver.js` (text-timed visemes)
+unchanged. 2D-A (the person's own unstyled photo) remains as a variant of the same runtime.
 
 **Browser lip-sync is a shared component, not an entrant.** One viseme bus feeds every renderer:
 
@@ -218,7 +229,7 @@ evaluation; buying the Developer Licence is an owner decision, and only if it wi
 ## 6. Open decisions for the owner
 
 1. **Voice and brain.** Does "no API that costs us money" also cover the voice (ElevenLabs) and the LLM? The avatars here cost 0 per minute, but every call still pays both. If it does, the arena needs a voice track. The browser's own speech synthesis is free on the device, with variable quality. Kokoro has Spanish voices but carries a GPL phonemizer that needs a legal check. HeadTTS is English only.
-2. **Style.** Confirm "realistic only" for this arena, with anime (See-through + Iki/StretchyStudio, or VRM) parked as LATER.
+2. **Style.** Decided 2026-11-16: all three styles (Animated Feature Film first, Realistic Game Character, Anime 3D).
 3. **Wireface.** May we evaluate a closed SDK whose character preparation runs on their server with Gemini? If it wins, the cost is GBP 50/year, and user photos would go to a third party (a GDPR processor agreement).
 4. **Where creation runs.** 2D-A can be built entirely on the person's device. 3D-A needs Blender on a small CPU server. Does that count as "not spending resources"?
 5. **iPhone.** Which model and iOS version is the reference? The test needs a cable and Safari's Web Inspector on the Mac.

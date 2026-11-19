@@ -1,0 +1,5 @@
+# media and model files stay local (lab/.gitignore covers png/webm/mp4)
+chars/**/*.png
+chars/*.log
+chars/.status
+vendor/*.task

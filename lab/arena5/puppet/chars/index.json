@@ -1,0 +1,61 @@
+[
+ {
+  "id": "anime_m",
+  "name": "Kai",
+  "style": "anime",
+  "styleName": "Anime 3D",
+  "voice": "imani_en_t",
+  "sprites": []
+ },
+ {
+  "id": "anime_w",
+  "name": "Sora",
+  "style": "anime",
+  "styleName": "Anime 3D",
+  "voice": "nova_es_t",
+  "sprites": []
+ },
+ {
+  "id": "film_m",
+  "name": "Teo",
+  "style": "film",
+  "styleName": "Animated Feature Film",
+  "voice": "imani_en_t",
+  "sprites": []
+ },
+ {
+  "id": "film_w",
+  "name": "Lia",
+  "style": "film",
+  "styleName": "Animated Feature Film",
+  "voice": "nova_es_t",
+  "sprites": [
+   "E",
+   "FF",
+   "O",
+   "aa",
+   "mid"
+  ]
+ },
+ {
+  "id": "game_m",
+  "name": "Rowan",
+  "style": "game",
+  "styleName": "Realistic Game Character",
+  "voice": "imani_en_t",
+  "sprites": []
+ },
+ {
+  "id": "game_w",
+  "name": "Mei",
+  "style": "game",
+  "styleName": "Realistic Game Character",
+  "voice": "nova_es_t",
+  "sprites": [
+   "E",
+   "FF",
+   "aa",
+   "mid"
+  ]
+ }
+]

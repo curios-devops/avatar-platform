@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portrait puppet</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Styled portrait puppet <span>arena 5</span></h1>
+    <p id="style">loading</p>
+  </header>
+  <div class="wrap"><canvas id="stage"></canvas></div>
+  <section class="controls">
+    <label>Character <select id="char"></select></label>
+    <label>Mouth <select id="mouth"><option value="drawn">drawn inner mouth</option><option value="sprites">generated mouth sprites</option></select></label>
+    <label>Voice line <select id="clip"></select></label>
+    <div class="buttons"><button id="speak">Speak</button><button id="listen">Listen</button></div>
+  </section>
+  <dl class="stats">
+    <div><dt>fps</dt><dd id="fps">-</dd></div>
+    <div><dt>main thread ms/frame (mean / p95)</dt><dd id="ms">-</dd></div>
+    <div><dt>audio to mouth lag (last line)</dt><dd id="lag">-</dd></div>
+    <div><dt>viseme</dt><dd id="vis">-</dd></div>
+    <div><dt>character load</dt><dd id="loadms">-</dd></div>
+  </dl>
+  <p class="note">Rendered entirely in this browser from one portrait image: WebGL2 mesh warp over MediaPipe face landmarks,
+  visemes timed from the TTS text (lip-sync test method C, 50 ms lead). Lag is measured on the heard-audio clock.</p>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
