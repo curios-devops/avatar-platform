@@ -31,8 +31,8 @@ OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379
         176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
 STABLE = [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 109, 338, 67, 297, 103, 332, 54, 284, 21, 251, 162, 389, 127, 356,
           234, 454, 70, 300]
-BIG = ("aa", "laugh")  # the brows, nose and cheeks move in these: a looser stable bar
-POSES = ["talk_mid", "aa", "OU", "E", "MBP", "laugh", "blink"]
+BIG = ("aa", "laugh", "laugh2")  # the brows, nose and cheeks move in these: a looser stable bar
+POSES = ["talk_mid", "aa", "OU", "E", "MBP", "laugh", "blink", "smirk"]  # smirk: closed-mouth listening smile (nico)
 
 
 def detector():
@@ -51,9 +51,11 @@ def detect(det, rgb):
 
 
 def load(path, size=None):
+    """size: an int (square) or (w, h); nico is 4:5 (head to mid-chest)."""
     im = cv2.cvtColor(cv2.imread(str(path)), cv2.COLOR_BGR2RGB)
-    if size and im.shape[:2] != (size, size):
-        im = cv2.resize(im, (size, size), interpolation=cv2.INTER_AREA if im.shape[0] > size else cv2.INTER_LANCZOS4)
+    w, h = (size, size) if isinstance(size, int) else (size or (0, 0))
+    if size and im.shape[:2] != (h, w):
+        im = cv2.resize(im, (w, h), interpolation=cv2.INTER_AREA if im.shape[1] > w else cv2.INTER_LANCZOS4)
     return im
 
 
@@ -70,7 +72,7 @@ def gate(cid):
     d = HERE / "chars" / cid
     det = detector()
     raws = sorted((d / "kf" / "raw").glob("*.png"))
-    size = load(raws[0]).shape[0]
+    size = load(raws[0]).shape[1::-1]
     port = load(d / "portrait.png", size)
     P, _ = detect(det, port)
     fw = np.linalg.norm(P[454, :2] - P[234, :2])
@@ -105,7 +107,7 @@ def adopt(cid, specs):
     d = HERE / "chars" / cid
     det = detector()
     port = load(d / "portrait.png")
-    S = port.shape[0]
+    S = port.shape[1::-1]
     for spec in [x for x in specs if x.startswith("rest=")]:
         # replacement-face styles: an edited neutral face replaces the portrait, so every face shares one surface
         # (the clay portrait's tool marks differed from all the edits); the original stays as portrait_orig.png
@@ -117,7 +119,7 @@ def adopt(cid, specs):
     specs = [x for x in specs if not x.startswith("rest=")]
     P, _ = detect(det, port)
     idx_path = d / "kf" / "index.json"
-    index = json.loads(idx_path.read_text()) if idx_path.exists() else {"w": S, "h": S, "poses": {}}
+    index = json.loads(idx_path.read_text()) if idx_path.exists() else {"w": S[0], "h": S[1], "poses": {}}
     index["poses"]["rest"] = {"src": "portrait.png", "points": np.round(P, 2).tolist()}
     pm = oval_mask(P, port.shape, 0.9) > 0
     for spec in specs:
@@ -154,10 +156,11 @@ def sheet(cid):
     for pose in ["rest"] + POSES:
         if pose not in index["poses"]:
             continue
-        im = load(d / ("portrait.png" if pose == "rest" else f"kf/{pose}.png"), 512)
+        H5 = round(512 * index["h"] / index["w"])
+        im = load(d / ("portrait.png" if pose == "rest" else f"kf/{pose}.png"), (512, H5))
         pts = np.array(index["poses"][pose]["points"])[:, :2] * 512 / index["w"]
         c = pts.mean(0)
-        x0, y0 = int(max(0, min(512 - 300, c[0] - 150))), int(max(0, min(512 - 300, c[1] - 140)))
+        x0, y0 = int(max(0, min(512 - 300, c[0] - 150))), int(max(0, min(H5 - 300, c[1] - 140)))
         t = im[y0:y0 + 300, x0:x0 + 300].copy()
         cv2.putText(t, pose, (6, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         tiles.append(t)

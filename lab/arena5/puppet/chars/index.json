@@ -117,6 +117,26 @@
   "kfMode": "morph"
  },
  {
+  "id": "nico",
+  "name": "Nico",
+  "style": "semigame",
+  "styleName": "Semi-realistic game",
+  "voice": "nico_en_1",
+  "sprites": [],
+  "kf": [
+   "E",
+   "MBP",
+   "OU",
+   "aa",
+   "blink",
+   "laugh",
+   "rest",
+   "smirk",
+   "talk_mid"
+  ],
+  "kfMode": "morph"
+ },
+ {
   "id": "semi_m",
   "name": "Dario",
   "style": "semi",

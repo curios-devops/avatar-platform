@@ -19,7 +19,7 @@
 
 import { OVAL } from './puppet.js';
 
-const KEYS = ['rest', 'talk_mid', 'aa', 'OU', 'E', 'MBP', 'laugh', 'blink'];
+const KEYS = ['rest', 'talk_mid', 'aa', 'OU', 'E', 'MBP', 'laugh', 'blink', 'smirk'];  // smirk: closed listening smile (nico)
 const INNER = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
 const EYE_LOOPS = [[33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7],
   [263, 466, 388, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249]];
@@ -37,7 +37,7 @@ const VIS = {
 // switches faster than the shape: the eyes (upper face) as a cut at the half-way point (the shape stays a morph,
 // so the lids still travel), the mouth a little softer
 // a pose a character lacks (a keyframe rejected at the gate) borrows its nearest neighbour
-const FALLBACK = { aa: 'talk_mid', OU: 'talk_mid', E: 'talk_mid', talk_mid: 'rest', laugh: 'E', MBP: 'rest', blink: 'rest' };
+const FALLBACK = { aa: 'talk_mid', OU: 'talk_mid', E: 'talk_mid', talk_mid: 'rest', laugh: 'E', MBP: 'rest', blink: 'rest', smirk: 'rest' };
 const GAMMA_U = 40, GAMMA_L = 10;
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -233,13 +233,17 @@ export class Morph {
     const s = Math.min(1, st.expressSmile || 0), l = Math.min(1, st.laugh || 0), p = st.laughPulse ?? 1;
     const b = Math.max(st.blink?.[0] || 0, st.blink?.[1] || 0);
     const lo = {}, up = {};
+    // smirk (listening): the rest share of the lower face, and a little of the upper face, becomes the closed smile
+    const sm = this.keys.includes('smirk') ? Math.min(1, st.smirk || 0) : 0;
+    if (sm > 0 && vis.rest) { add(vis, 'smirk', vis.rest * sm); vis.rest *= 1 - sm; }
     for (const [k, w] of Object.entries(vis)) add(lo, k, w * (1 - l) * (1 - s));
     add(lo, 'E', (1 - l) * s);
     add(lo, 'laugh', l * p); add(lo, 'E', l * (1 - p));
     add(up, 'laugh', l);
     add(up, 'blink', (1 - l) * b);
     add(up, 'E', (1 - l) * (1 - b) * s * 0.7);
-    add(up, 'rest', (1 - l) * (1 - b) * (1 - s * 0.7));
+    add(up, 'smirk', (1 - l) * (1 - b) * (1 - s * 0.7) * sm * 0.6);
+    add(up, 'rest', (1 - l) * (1 - b) * (1 - s * 0.7) * (1 - sm * 0.6));
     return { up, lo };
   }
 

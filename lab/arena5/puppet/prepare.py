@@ -19,9 +19,9 @@ from mediapipe.tasks.python.vision import FaceLandmarksConnections as C
 HERE = pathlib.Path(__file__).resolve().parent
 MODEL = pathlib.Path.home() / ".cache/mediapipe/face_landmarker.task"
 STYLES = {"film": "Animated Feature Film", "game": "Realistic Game Character", "anime": "Anime 3D",
-          "semi": "Semi-realistic Illustration", "clay": "Clay Stop Motion", "crochet": "Crochet Amigurumi"}
+          "semi": "Semi-realistic Illustration", "semigame": "Semi-realistic game", "clay": "Clay Stop Motion", "crochet": "Crochet Amigurumi"}
 NAMES = {"film_w": "Lia", "film_m": "Teo", "game_w": "Mei", "game_m": "Rowan", "anime_w": "Sora", "anime_m": "Kai",
-         "semi_m": "Dario", "clay_w": "Greta", "crochet_m": "Bruno"}
+         "semi_m": "Dario", "nico": "Nico", "clay_w": "Greta", "crochet_m": "Bruno"}
 LIPS = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
         61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
 
@@ -73,10 +73,10 @@ def main():
             print(d.name, "NO FACE FOUND")
             continue
         (d / "landmarks.json").write_text(json.dumps(r, separators=(",", ":")))
-        style = d.name.split("_")[0]
+        style = "semigame" if d.name == "nico" else d.name.split("_")[0]
         sprites = sorted(p.stem for p in (d / "mouth").glob("*.png") if not p.stem.startswith("_")) if (d / "mouth").exists() else []
         index.append({"id": d.name, "name": NAMES.get(d.name, d.name), "style": style, "styleName": STYLES.get(style, style),
-                      "voice": "imani_en_t" if d.name.endswith("_m") else "nova_es_t", "sprites": sprites,
+                      "voice": "nico_en_1" if d.name == "nico" else "imani_en_t" if d.name.endswith("_m") else "nova_es_t", "sprites": sprites,
                       "kf": sorted(json.loads((d / "kf" / "index.json").read_text())["poses"]) if (d / "kf" / "index.json").exists() else [],
                       "kfMode": "replace" if style in ("clay", "crochet") else "morph"})
         p = r["points"]

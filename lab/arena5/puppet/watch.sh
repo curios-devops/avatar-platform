@@ -14,10 +14,10 @@ while pgrep -f "$PAT" >/dev/null; do
   free=$(memory_pressure | awk -F': ' '/free percentage/{gsub("%","",$2); print $2}')
   [ -n "$free" ] && [ "$free" -lt "$minfree" ] && minfree=$free
   heat=$(pmset -g therm | grep -E "CPU_Speed_Limit *= *[0-9]{1,2}$" || true)
-  [ "$(cat "$ST" 2>/dev/null)" = "loading" ] && limit=9 || limit=3
+  [ "$(cat "$ST" 2>/dev/null)" = "loading" ] && limit=${LOAD_LIMIT:-9} || limit=3
   [ "$lvl" -ge 4 ] && stop "memory critical"
   [ -n "$heat" ] && stop "heat: $heat"
-  if [ "$lvl" -gt 1 ] || [ "$grown" -gt 3000 ]; then bad=$((bad+1)); echo "$(date +%H:%M:%S) WARN level=$lvl swap+${grown}M ($bad/$limit)"; else bad=0; fi
+  if [ "$lvl" -gt 1 ] || [ "$grown" -gt ${SWAP_MB:-3000} ]; then bad=$((bad+1)); echo "$(date +%H:%M:%S) WARN level=$lvl swap+${grown}M ($bad/$limit)"; else bad=0; fi
   [ $bad -ge $limit ] && stop "level=$lvl swap+${grown}M"
   sleep 5
 done

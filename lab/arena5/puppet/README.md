@@ -91,6 +91,73 @@ Best sheets: `chars/film_w/shots/compare.png` (row 1 old sprites, row 2 morph; s
   saccade on replacement faces; no smile when listening (no closed-smile key pose); Safari and phones untested.
 - **Lag numbers** for the male characters use a different voice clip than the female ones (as in pilot 1).
 
+## Nico "Lucky" Moretti, a new character on the keyframe morph (2026-11-19)
+
+`nico`: an original AI character, a creator who covers a crime sandbox game from **Sol Harbor**, an invented coastal
+city. Painted crime-game loading-screen style (cel-painted planes, ink lines, warm key, cool rim, dark plain
+backdrop), American man of about 30, fair skin, short messy dark-brown hair, light blue eyes, square jaw, stubble, a
+plain white t-shirt and a silver chain, framed **4:5 from the head to mid-chest** (the first non-square character).
+No reference image, logo, brand, real person or game name went into any prompt. Page:
+`http://127.0.0.1:8791/puppet/?char=nico` (a character with keyframes now opens on its keyframe engine).
+
+**Made with** FLUX.2 [klein] 4B q4, the pilot 2 setup (`kf.py serve`, one process, text encoder dropped, tiled VAE),
+under `watch.sh` with the load allowance cut to the same 3 checks (`LOAD_LIMIT=3`) and the swap guard at 600 MB for the
+last job (`SWAP_MB`). Prompts, seeds, seconds and MLX peaks: `chars/nico/kf/gen.jsonl`; gate numbers:
+`chars/nico/kf/raw/gate.json`; which raw became which pose: `chars/nico/kf/index.json`.
+
+| Step | Size | Time per image | MLX peak | Notes |
+|---|---|---|---|---|
+| Portrait, 2 rounds x 4 seeds | 640x800 | 25 s | 3.1-3.2 GB | 768x960 was stopped by the watchdog; round 1 (71-74) read as clean vector comic art, round 2 asks for gouache-like posterized brush strokes; **seed 76** chosen (asymmetry, a hint of a smirk, the most "painted") |
+| Keyframes, 2 rounds, 15 edits | 512x640 (ref 512x640) | **27-28 s** | 3.9-4.3 GB | 640x800 and 576x720 edits were stopped at the first denoising step (memory pressure "warn" 15 s); 512x640 with the MLX cache at 0 (`MLX_CACHE_MB=0`) passed |
+
+Generation 14:47 to 15:06 (19 min wall, ~10 min of compute). The watchdog stopped the process 5 times (all
+memory pressure, never heat); other apps held ~4.5 GB in the compressor (a dev server, Chrome, another session's
+tests) and swap reached 4.8 GB, so round 3 was not run and `blink` stayed on round 1.
+
+**Key poses (9)**: rest (the portrait), talk_mid (`talk_soft`), aa, OU (`OU3`: a gentle "you", not a pucker), E (`E2`:
+the wide grin), MBP, laugh (`laugh2`), blink, and a new **smirk**: a closed-mouth confident smile for listening.
+`morph.js` takes `smirk` as an optional 9th key: the listening share of the lower face (and 60 % of the upper face)
+moves to it; `app.js` eases it in over ~0.6 s when he stops talking and out in ~0.1 s when he speaks. Characters
+without it are unchanged (it falls back to rest).
+
+Rejected on sight (round 1): talk, OU and MBP had his stubble shaved off and the face airbrushed (the "smooth skin,
+no wrinkles" line did it; round 2 says "no wrinkles" and "keep the same stubble and brush texture"); OU2 was duck
+lips. Gate: every adopted pose passes (stable 0.6-1.8 %, out 5.5-6.3).
+
+**Voice** (`nico_voice.py`, the `fetch_timed.py` recipe: `stream/with-timestamps`, eleven_v4_turbo, no tags):
+ElevenLabs premade **Liam** (young, American, "social media creator"). 4 lines, 495 characters, 247 credits billed
+(about 0.05 USD). Clips: `../lipsync/clips/nico_{en_1,en_2,es_1,es_2}.json` (text, alignment, stream log; the mp3s stay
+local). The "Ha ha!" in `nico_en_1` is marked in the JSON (`laughs`: start and length from the alignment) and drives the
+laugh channel on the heard-audio clock.
+
+- EN 1: "Yo, what's up, Sol Harbor! Nico here, your favorite AI, so I have zero excuses for crashing. Ha ha! Quick tip:
+  park the getaway car facing the exit. Trust me."
+- EN 2: "Real talk: stop driving into the ocean. The jet ski is right there, man. Stick around and I'll show you where."
+- ES 1: "¡Qué onda, Sol Harbor! Soy Nico, una IA con muy buen gusto. Tip rápido: guarda el coche antes de la misión. De
+  nada, bro."
+- ES 2: "Sí, ya sé: otra vez perdiste la moto en el puerto. Tranqui, en treinta segundos te enseño dónde reaparece."
+
+**Numbers** (Chrome, M2 Pro, canvas 1216x1520): 120 fps median (p5 102), 0.34 ms main thread per frame (p95 0.6);
+lag -67 ms (`nico_en_1`) and -50 ms (`nico_es_2`); listening 0.28 ms per frame.
+
+**Sheet**: `chars/nico/shots/sheet_nico.png` (`__puppet.poseSheet()`): row 1 the nine held poses, rows 2-3 a
+12-frame timeline of `nico_en_1` with its laugh at 6.6 s and the smirk once he stops. `shots/live_listen.png`: the
+live page while listening.
+
+**Verdict, harshly.** Looks: a good-looking, likeable face with a real grin and the chain and t-shirt intact in
+every pose; the smirk and the laugh sell the character. Slop: the portrait itself still reads as a polished "AI comic
+portrait" more than a hand-painted loading screen, and the edits at 512 px lose some of its brush texture (the face
+is a little smoother and more vector-like than the rest pose, visible when it cross-fades). Teeth: separate and
+softly shaded in E and laugh, lower row partly hidden: pass.
+
+**Still failing**
+- **Laugh wrinkles**: both laugh rounds have strong crow's feet and creases on the forehead and nose bridge, more than
+  "light, at 30"; E2 and smirk are within bounds. Same failure as clay: the edit model draws a laugh with creases.
+- **O viseme**: O is OU 0.6 + aa 0.4; Nico's OU is nearly closed, so the blend stretches it open into a pink slot.
+  A per-character viseme map (O to OU only) or a rounder OU key would fix it.
+- **Transition frames**: the grey half-teeth when the mouth passes between keys (pilot 2's open issue) shows on E.
+- Generated at 512x640 and upscaled to 640x800: soft on a large screen; needs a quieter Mac (or a GPU) for 768+.
+
 ## What was built
 
 ```
@@ -284,4 +351,6 @@ backend/.venv/bin/python lab/arena5/puppet/kfprep.py gate semi_m        # then l
 backend/.venv/bin/python lab/arena5/puppet/kfprep.py adopt semi_m [pose=raw_name ...]; ... prepare.py
 # page: ?char=film_w&mouth=morph (clay, crochet: mouth=replace); Laugh button; __puppet.compare({id}) writes
 # chars/<id>/shots/compare.png (old engine vs new, same offline timeline, laugh at the end)
+# nico: SIZE=640x800 ... add portrait nico 76; SIZE=512x640 ... add kf nico talk_soft aa OU3 E2 MBP2 laugh2 blink smirk
+# (MLX_CACHE_MB=0 for kf.py serve); python3 lab/arena5/puppet/nico_voice.py; page ?char=nico, __puppet.poseSheet()
 ```

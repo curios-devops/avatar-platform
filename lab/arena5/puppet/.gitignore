@@ -4,3 +4,5 @@ chars/*.log
 chars/.status
 vendor/*.task
 chars/.queue/
+chars/**/*.mp4
+chars/**/*.mp3

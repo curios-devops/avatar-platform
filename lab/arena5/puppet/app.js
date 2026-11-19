@@ -12,14 +12,14 @@ import { SHAPES, blendPose, PoseSmoother } from '../lipsync/lib/visemes.js';
 import { envelope, syncLag } from '../lipsync/lib/metrics.js';
 
 const $ = (id) => document.getElementById(id);
-const CLIPS = { nova_es_t: 'es', hana_es_t: 'es', imani_en_t: 'en' };
+const CLIPS = { nova_es_t: 'es', hana_es_t: 'es', imani_en_t: 'en', nico_en_1: 'en', nico_en_2: 'en', nico_es_1: 'es', nico_es_2: 'es' };
 const LEAD_MS = 50, FPS = 60;
 const q = new URLSearchParams(location.search);
 
 let chars = [], ch = null, puppet = null, tess = null, ctx = null, run = null, freeze = null, still = false, last = performance.now();
 const idle = new Idle(11);
 const costs = [], frames = [];
-let lastResult = null, hook = null, laughAt = -10, laughDur = 1.4;
+let lastResult = null, hook = null, laughAt = -10, laughDur = 1.4, smirk = 0;
 
 async function ensureCtx() {
   if (!ctx) ctx = new AudioContext({ sampleRate: 24000, latencyHint: 'interactive' });
@@ -99,7 +99,7 @@ async function speak(id = $('clip').value) {
   const driver = createMouthDriver({ method: 'text', context: ctx, clock, cues: cuesFromAlignment(meta.alignment, CLIPS[id]), leadMs: LEAD_MS, loop: false });
   await driver.start();
   src.start(T0);
-  const r = run = { id, src, driver, clock, env, dur: buffer.duration, rec: [], costs: [], frameTimes: [] };
+  const r = run = { id, src, driver, clock, env, dur: buffer.duration, rec: [], costs: [], frameTimes: [], laughs: meta.laughs || [] };
   return new Promise((resolve) => {
     src.onended = () => setTimeout(() => {
       if (run !== r) return resolve(null);
@@ -147,6 +147,11 @@ function frame(now) {
   idle.setMode(run || freeze ? 'speaking' : 'listening');
   const st = still ? { blink: [0, 0], gaze: [0, 0], head: null, brow: 0, smile: 0, breath: 0 } : idle.step(dt, pose.open);
   st.pose = pose; st.vis = weights; st.dt = dt; st.t = now / 1000;
+  // a laugh written in the line ("Ha ha", clip JSON `laughs`) drives the laugh channel on the heard-audio clock
+  if (run?.laughs.length) { const h = run.clock(); for (const L of run.laughs) if (h >= L.at && h < L.at + L.dur && laughAt < now / 1000 - laughDur) { laughAt = now / 1000 - (h - L.at); laughDur = L.dur; } }
+  // listening: the closed-mouth smirk key pose (characters that have one), eased in over ~0.6 s, out fast when speaking
+  smirk += ((run || freeze || still ? 0 : 1) - smirk) * (1 - Math.exp(-dt / (run ? 0.12 : 0.6)));
+  st.smirk = smirk;
   Object.assign(st, laughState(now / 1000));
   if (puppet instanceof Puppet) oldLaugh(st);
   const gap = puppet ? puppet.render(st) : 0;
@@ -295,6 +300,63 @@ async function compare({ id = ch.id, clip = ch.voice, engines = null, times = nu
   return { saved, info, times };
 }
 
+/**
+ * Contact sheet (nico, 2026-11-19), offline and deterministic: row 1 the nine held poses (each channel held 0.5 s,
+ * still head), rows 2-3 a 12-frame talking timeline of a clip, with the clip's own laugh (`laughs`) and the listening
+ * smirk after the line. Saves chars/<id>/shots/<name>.png.
+ */
+async function poseSheet({ id = ch.id, clip = ch.voice, from = 0.3, to = null, tile = 220, zoom = 1.25, name = 'sheet_nico' } = {}) {
+  const chr = chars.find((c) => c.id === id);
+  const W = 600, H = 750, ar = H / W, th = Math.round(tile * ar);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const eng = await makeEngine(c, chr, chr.kfMode || 'morph');
+  eng.setView(zoom);
+  const s = document.createElement('canvas');
+  s.width = 9 * tile; s.height = th + 2 * Math.round(tile * 1.5 * ar) + 40;
+  const g = s.getContext('2d');
+  g.fillStyle = '#111'; g.fillRect(0, 0, s.width, s.height);
+  const label = (x, y, w, txt) => { g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(x, y, w, 18); g.fillStyle = '#fff'; g.font = '12px system-ui'; g.fillText(txt, x + 4, y + 13); };
+  const base = { blink: [0, 0], gaze: [0, 0], head: null, brow: 0, smile: 0, breath: 0, laugh: 0, laughPulse: 1, smirk: 0 };
+  const POSES = [['rest', { vis: { sil: 1 } }], ['talk', { vis: { DD: 1 } }], ['aa', { vis: { aa: 1 } }], ['O', { vis: { O: 1 } }], ['E', { vis: { E: 1 } }],
+    ['MBP', { vis: { PP: 1 } }], ['laugh', { vis: { aa: 1 }, laugh: 1 }], ['blink', { vis: { sil: 1 }, blink: [1, 1] }], ['smirk', { vis: { sil: 1 }, smirk: 1 }]];
+  for (const [i, [nm, over]] of POSES.entries()) {
+    for (let f = 0; f < 30; f++) eng.render({ ...base, ...over, pose: SHAPES[Object.keys(over.vis)[0]] || SHAPES.sil, dt: 1 / 60, t: f / 60 });
+    g.drawImage(c, i * tile, 0, tile, th); label(i * tile, 0, tile, nm);
+  }
+  // timeline
+  const meta = await fetch(`../lipsync/clips/${clip}.json`).then((r) => r.json());
+  const cues = cuesFromAlignment(meta.alignment, CLIPS[clip]);
+  const end = cues[cues.length - 1].t;
+  to = to ?? end + 0.8;
+  const times = Array.from({ length: 12 }, (_, k) => from + (k * (to - from)) / 11);
+  const id2 = new Idle(11), sm = new PoseSmoother(), tw = Math.round(tile * 1.5), tth = Math.round(tw * ar);
+  let k = 0, smk = 0;
+  for (let f = 0; k < times.length; f++) {
+    const t = f / 60, dt = 1 / 60, speaking = t < end + 0.1;
+    const w = speaking ? sampleCues(cues, t + LEAD_MS / 1000) : { sil: 1 };
+    const pose = { ...sm.step(blendPose(w), dt) };
+    id2.setMode(speaking ? 'speaking' : 'listening');
+    const st = id2.step(dt, pose.open);
+    smk += ((speaking ? 0 : 1) - smk) * (1 - Math.exp(-dt / (speaking ? 0.12 : 0.6)));
+    const L = (meta.laughs || []).find((x) => t >= x.at && t < x.at + x.dur);
+    const ls = L ? (laughAt = L.at, laughDur = L.dur, laughState(t)) : { laugh: 0, laughPulse: 1 };
+    Object.assign(st, { pose, vis: w, dt, t, smirk: smk }, ls);
+    eng.render(st);
+    while (k < times.length && t + 1e-6 >= times[k]) {
+      const x = (k % 6) * tw, y = th + 20 + Math.floor(k / 6) * tth;
+      g.drawImage(c, x, y, tw, tth);
+      const lab = st.laugh > 0.05 ? `laugh ${st.laugh.toFixed(1)}` : !speaking ? `listen, smirk ${smk.toFixed(1)}` : Object.entries(w).sort((a, b) => b[1] - a[1])[0][0];
+      label(x, y, tw, `${t.toFixed(2)} s ${lab}`);
+      k++;
+    }
+  }
+  laughAt = -10; laughDur = 1.4;
+  eng.gl.getExtension('WEBGL_lose_context')?.loseContext();
+  g.fillStyle = '#ccc'; g.font = '13px system-ui';
+  g.fillText(`${chr.styleName} · ${chr.name} · row 1: held key poses · rows 2-3: ${clip} "${meta.text.slice(0, 70)}…" ${from.toFixed(2)}-${to.toFixed(2)} s`, 8, s.height - 8);
+  return post(`chars/${id}/shots/${name}.png`, await pngOf(s));
+}
+
 function laugh(dur = 1.4) { laughAt = performance.now() / 1000; laughDur = dur; }
 
 async function capture(name) { return post(`chars/${ch.id}/shots/${name}.png`, await pngOf(puppet.canvas)); }
@@ -318,9 +380,11 @@ async function main() {
   $('listen').onclick = () => { stop(); setFreeze(null); };
   $('laugh').onclick = () => laugh();
   addEventListener('resize', sizeCanvas);
-  await load(q.get('char') || chars[0].id, q.get('mouth') || 'drawn');
+  // a character with keyframes opens on its keyframe engine (?char=nico), unless ?mouth= says otherwise
+  const first = chars.find((c) => c.id === q.get('char')) || chars[0];
+  await load(first.id, q.get('mouth') || (first.kf?.length ? first.kfMode : 'drawn'));
   requestAnimationFrame(frame);
-  window.__puppet = { load, speak, stop, sheet, compare, laugh, exportPre, detect, capture, freeze: setFreeze, result: () => lastResult,
+  window.__puppet = { load, speak, stop, sheet, compare, poseSheet, laugh, exportPre, detect, capture, freeze: setFreeze, result: () => lastResult,
     stats: () => ({ fps: frames.length, msMean: costs.reduce((a, b) => a + b, 0) / costs.length, canvas: [puppet.canvas.width, puppet.canvas.height] }) };
   document.body.dataset.ready = '1';
 }

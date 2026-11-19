@@ -69,6 +69,29 @@ PEOPLE = {
                          "felt teeth stitched in where teeth show"),
 }
 
+# nico (2026-11-19): 4:5, head to mid-chest (SIZE=768x960 portrait, 640x800 edits); about 30, so only light crow's feet
+# and laugh lines, and only when smiling; a closed-mouth listening smirk as a 9th key pose
+NICO_FRAME = ("Front-facing portrait framed from just above the top of the head down to mid-chest, the head centred in "
+              "the upper part of the tall frame, head straight and level, shoulders square to the camera, eyes open "
+              "looking straight into the camera, lips closed. Plain dark backdrop with no objects, no text, no letters, "
+              "no logo, no watermark, no title, no hands. Natural asymmetry in the face; no airbrushed plastic skin; "
+              "not a glossy generic render.")
+# round 2 of the portrait: round 1 (seeds 71-74, gen.jsonl) read as clean vector comic art with thin even lines
+NICO = ("Hand-painted crime-game loading-screen artwork, an original character. Gouache-like painting with thick visible "
+        "brush strokes and posterized colour planes in the skin, hair and t-shirt, cel-painted shadows, black ink lines "
+        "of varying weight on the eyelids, nose, lips, jaw and t-shirt folds, not vector art and not a flat comic, a "
+        "gritty painted texture, a strong warm "
+        "orange key light from the left and a cool cyan-blue rim light on the right edge of the face, hair and shoulder, "
+        "high contrast. A handsome American man of about 30 with the face of a social-media star: fair light skin with "
+        "a little pink in the cheeks, a strong defined square jaw and chin, a few days of dark stubble, short dark-brown "
+        "hair slightly messy on top, light blue eyes, thick straight dark eyebrows, a straight nose, one eyebrow a "
+        "little higher than the other. A confident relaxed look with a hint of mischief in the eyes, the mouth closed "
+        "with the corners very slightly up. Smooth skin with no wrinkles. He wears a plain white crew-neck cotton "
+        "t-shirt with no print and no logo, and a silver metal chain necklace with chunky links lying clearly visible "
+        "on the t-shirt below the collar. Backdrop: plain dark charcoal blue. " + NICO_FRAME)
+PEOPLE["nico"] = ("semi", 76, NICO, True, "painted lips and individual softly shaded teeth, separated by thin gaps, with fine "
+                                           "ink outlines, matching the illustration")
+
 KEEP = ("Keep exactly the same character and identity, the same face shape, hair, clothes, background, lighting, colours "
         "and rendering style, the same camera, framing, head size and head position, still looking into the camera. "
         "Change only the facial expression: ")
@@ -102,6 +125,15 @@ POSES = {
              "natural separation and soft shading, the lower row partly hidden by the lower lip, a hint of gum above the "
              "upper teeth, the cheeks pushed up, the eyes narrowed into happy crescents with the lower eyelids raised, "
              "the head tilted back very slightly.",
+    # nico: the 9th key pose (listening) and a grin for E
+    "OU3": "the lips gently rounded into a small 'oo' shape as in the word 'you', a small dark round opening, the lips "
+           "only slightly forward, not puckered, not pouting, no teeth visible, no smile, the jaw slightly lowered.",
+    "smirk": "a confident closed-mouth smirk while listening: the lips stay closed with no teeth showing, one mouth "
+             "corner pulled up a little higher than the other, the cheeks lifted a little, the eyes slightly narrowed "
+             "with amusement, the eyebrows relaxed, a charming, slightly mischievous look.",
+    "E2": "a wide charismatic grin while saying 'eh': the mouth corners pulled up and back, the whole upper row of front "
+          "teeth visible as separate individual teeth with thin gaps and soft shading, the lower teeth barely visible, "
+          "the cheeks raised, the eyes a little narrowed with confidence and a hint of mischief.",
     "rest": "a neutral relaxed expression, lips gently closed, eyes open looking into the camera.",
     "blink": "both eyes fully closed in a relaxed blink, the eyelids smooth and soft, the mouth closed and neutral exactly "
              "as before.",
@@ -113,6 +145,19 @@ AGE = {"talk_soft": " The faint lines from the nose to the mouth corners stay vi
        "laugh": " Deep nasolabial folds from the nose to the mouth corners and clear crow's feet wrinkles fanning out from "
                 "the outer eye corners, as on a man of forty.",
        "talk_mid": " The faint lines from the nose to the mouth corners stay visible."}
+AGE_NICO = {"E2": " Only light crow's feet at the outer eye corners and soft laugh lines beside the mouth appear with the "
+                   "grin, as on a man of thirty; the forehead and the rest of the face stay smooth.",
+            "laugh2": " Only a few light crow's feet at the outer eye corners and soft laugh lines beside the mouth, as on "
+                      "a man of thirty; no lines on the forehead, no creases between the eyebrows or on the nose.",
+            "smirk": " A faint laugh line at the raised mouth corner and a hint of crow's feet, as on a man of thirty; the "
+                     "forehead stays smooth."}
+# round 2 (nico): round 1's "smooth skin" line shaved off his stubble and airbrushed the face in talk, OU and MBP;
+# the laugh got forehead lines; OU2 became duck lips
+SMOOTH30 = " No wrinkles, as on a man of thirty."
+NICO_KEEP = (" Keep the same few days of dark stubble on the jaw, chin, cheeks and upper lip, and the same painted "
+             "brush-stroke texture and ink lines. The silver chain necklace and the plain white t-shirt stay exactly the "
+             "same and fully visible.")
+
 # round 3 for clay (2026-11-19): rounds 1 and 2 kept a realistic human face under clay hair, so every expression came
 # with human creases (crow's feet, forehead folds); a simpler stop-motion head, and expressions made of simple shapes
 CLAY3 = ("Photograph of a real plasticine stop-motion animation puppet on a small studio set, an original character. "
@@ -148,13 +193,15 @@ SMOOTH = " The face stays smooth, with no wrinkles and no folds."
 def kf_prompt(cid: str, pose: str) -> str:
     style, _, _, aged, mouth = PEOPLE[cid]
     p = KEEP + (CLAY_POSES.get(pose) or POSES[pose.rstrip("3")] if style == "clay" and pose.endswith("3") else POSES[pose])
-    if aged:
+    if cid == "nico":
+        p += AGE_NICO.get(pose, "" if pose == "blink" else SMOOTH30) + NICO_KEEP
+    elif aged:
         p += AGE.get(pose, "")
     elif style in ("clay", "crochet"):
         p += SMOOTH + MATERIAL[style]
-    if mouth and pose not in ("blink", "MBP", "MBP2", "OU2", "talk_soft"):  # round 1 put teeth into MBP and OU through this line
+    if mouth and pose not in ("blink", "MBP", "MBP2", "OU2", "talk_soft", "smirk", "OU3"):  # round 1 put teeth into MBP and OU through this line
         p += f" The mouth is {mouth}."
-    elif mouth and pose in ("MBP2", "OU2"):
+    elif mouth and pose in ("MBP2", "OU2", "smirk", "OU3"):
         p += f" The lips are {LIPS[style]}, with no teeth showing."
     return p
 
@@ -183,7 +230,8 @@ def add(argv):
         i = rest.index("--tag"); tag = rest[i + 1]; rest = rest[:i] + rest[i + 2:]
     if "--seed" in rest:
         i = rest.index("--seed"); seed = int(rest[i + 1]); rest = rest[:i] + rest[i + 2:]
-    size = int(os.environ.get("SIZE", "768"))
+    size = os.environ.get("SIZE", "768")  # N or WxH
+    size = [int(x) for x in size.split("x")] if "x" in size else int(size)
     jobs = []
     if kind == "portrait":
         for s in rest or [PEOPLE[cid][1]]:
@@ -213,7 +261,7 @@ def serve():
     from mflux.models.common.config.model_config import ModelConfig
     from mflux.models.common.vae.tiling_config import TilingConfig
     from mflux.models.flux2.variants import Flux2Klein, Flux2KleinEdit
-    mx.set_cache_limit(256 << 20)
+    mx.set_cache_limit(int(os.environ.get("MLX_CACHE_MB", "256")) << 20)
     idle_since, done = time.time(), 0
     while True:
         if (QUEUE / "quit").exists():
@@ -245,7 +293,8 @@ def serve():
         model.text_encoder = None
         gc.collect()
         mx.clear_cache()
-        print(f"{now()} batch of {len(batch)}: model + {len(enc)} prompts in {time.time() - t0:.0f} s", flush=True)
+        print(f"{now()} batch of {len(batch)}: model + {len(enc)} prompts in {time.time() - t0:.0f} s, MLX active "
+              f"{mx.get_active_memory() / 2**30:.1f} GB after dropping the text encoder", flush=True)
         for jf, j in batch:
             status.write_text("cooling")
             while not calm():
@@ -258,8 +307,9 @@ def serve():
             mx.reset_peak_memory()
             try:
                 kw = {"image_paths": [str(HERE / j["ref"])]} if j["ref"] else {}
-                img = model.generate_image(seed=j["seed"], prompt=j["prompt"], num_inference_steps=STEPS, width=j["size"],
-                                           height=j["size"], guidance=1.0, **kw)
+                img = model.generate_image(seed=j["seed"], prompt=j["prompt"], num_inference_steps=STEPS,
+                                           width=j["size"][0] if isinstance(j["size"], list) else j["size"],
+                                           height=j["size"][1] if isinstance(j["size"], list) else j["size"], guidance=1.0, **kw)
                 img.save(path=str(out), export_json_metadata=False)
             except Exception as exc:  # one bad job must not end the queue
                 print(f"{now()} FAILED {j['out']}: {exc!r}", flush=True)
