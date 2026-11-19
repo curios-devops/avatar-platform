@@ -5,7 +5,9 @@
   "style": "anime",
   "styleName": "Anime 3D",
   "voice": "imani_en_t",
-  "sprites": []
+  "sprites": [],
+  "kf": [],
+  "kfMode": "morph"
  },
  {
   "id": "anime_w",
@@ -13,7 +15,46 @@
   "style": "anime",
   "styleName": "Anime 3D",
   "voice": "nova_es_t",
-  "sprites": []
+  "sprites": [],
+  "kf": [],
+  "kfMode": "morph"
+ },
+ {
+  "id": "clay_w",
+  "name": "Greta",
+  "style": "clay",
+  "styleName": "Clay Stop Motion",
+  "voice": "nova_es_t",
+  "sprites": [],
+  "kf": [
+   "E",
+   "MBP",
+   "OU",
+   "blink",
+   "laugh",
+   "rest",
+   "talk_mid"
+  ],
+  "kfMode": "replace"
+ },
+ {
+  "id": "crochet_m",
+  "name": "Bruno",
+  "style": "crochet",
+  "styleName": "Crochet Amigurumi",
+  "voice": "imani_en_t",
+  "sprites": [],
+  "kf": [
+   "E",
+   "MBP",
+   "OU",
+   "aa",
+   "blink",
+   "laugh",
+   "rest",
+   "talk_mid"
+  ],
+  "kfMode": "replace"
  },
  {
   "id": "film_m",
@@ -21,7 +62,9 @@
   "style": "film",
   "styleName": "Animated Feature Film",
   "voice": "imani_en_t",
-  "sprites": []
+  "sprites": [],
+  "kf": [],
+  "kfMode": "morph"
  },
  {
   "id": "film_w",
@@ -35,7 +78,18 @@
    "O",
    "aa",
    "mid"
-  ]
+  ],
+  "kf": [
+   "E",
+   "MBP",
+   "OU",
+   "aa",
+   "blink",
+   "laugh",
+   "rest",
+   "talk_mid"
+  ],
+  "kfMode": "morph"
  },
  {
   "id": "game_m",
@@ -43,7 +97,9 @@
   "style": "game",
   "styleName": "Realistic Game Character",
   "voice": "imani_en_t",
-  "sprites": []
+  "sprites": [],
+  "kf": [],
+  "kfMode": "morph"
  },
  {
   "id": "game_w",
@@ -56,6 +112,27 @@
    "FF",
    "aa",
    "mid"
-  ]
+  ],
+  "kf": [],
+  "kfMode": "morph"
+ },
+ {
+  "id": "semi_m",
+  "name": "Dario",
+  "style": "semi",
+  "styleName": "Semi-realistic Illustration",
+  "voice": "imani_en_t",
+  "sprites": [],
+  "kf": [
+   "E",
+   "MBP",
+   "OU",
+   "aa",
+   "blink",
+   "laugh",
+   "rest",
+   "talk_mid"
+  ],
+  "kfMode": "morph"
  }
 ]

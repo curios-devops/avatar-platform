@@ -11,6 +11,86 @@ gap (see below), and the limit of a 2D puppet (head turns of a few degrees only)
 It runs at the display's 120 fps on the M2 Pro with about 0.55 ms of main-thread work per frame, and the mouth is on the
 voice within the lip-sync test's numbers (+67 / -67 ms, the same as method C there).
 
+**Pilot 2 (2026-11-19), below: the verdict was still "AI slop"** (only a mouth patch moves; teeth a white strip; a seam
+on the realistic face; no age in the face). The fix piloted here: **the whole face changes**, from 8 full-face key poses
+per character made by an image-edit model, morphed in the browser. It works for the film and semi-realistic styles
+and for crochet; clay still fails the "no wrinkles" rule.
+
+## Pilot 2: whole-face expression keyframes (2026-11-19)
+
+### What changed
+
+```
+creation (once per character, Mac, ~5 min)                     call (every frame, browser, 0.3 ms)
+portrait --FLUX.2 [klein] 4B edit (kf.py)--> 7 key poses         viseme weights + smile + laugh + blink channels
+  talk_mid, aa, OU, E, MBP, laugh, blink (+ rest = portrait)       -> keyframe weights, upper face and lower face apart
+  -> kfprep.py gate: landmark drift + outside-face drift + eye     -> one interpolated mesh (keyframe meshes aligned to
+  -> kfprep.py adopt: colour mean matched, MediaPipe mesh            rest on stable points, blended per vertex)
+     per keyframe (kf/index.json)                                  -> portrait warped to it (hair, neck, backdrop), the
+                                                                      face oval cut with a feathered mask and refilled
+                                                                      with the 2-4 nearest keyframes, each warped from
+                                                                      its own mesh: no patch, no seam (morph.js)
+```
+
+- **Edit model: FLUX.2 [klein] 4B**, `mflux-community/flux2-klein-4b-mflux-q4` (Apache-2.0, base
+  `black-forest-labs/FLUX.2-klein-4B`; 4.62 GB download; mflux 0.24 `Flux2KleinEdit`, 4 steps, guidance 1). The
+  portrait is the only reference image; no reference photo, brand or real person went into any prompt.
+- **Time and memory (M2 Pro 16 GB)**: 53 s per keyframe at 768 px (film_w), **31 s at 640 px** (the other three),
+  new portraits 27 s at 768 (text-to-image, same weights). MLX peak 3.5 to 5.3 GB. 56 images in 31 min of compute,
+  ~65 min wall clock with cool-downs and restarts. The watchdog stopped the first runs three times (memory pressure
+  "warn" for 15 s at the first denoising step; the Mac had 4 GB in swap and 3.4 GB in the compressor from other apps);
+  what fixed it: the 4B text encoder dropped after encoding each batch, tiled VAE, MLX cache 256 MB, 640 px with a
+  640 px reference, and no Chrome tab open while generating. One process (`kf.py serve`) works through a job queue.
+- **Runtime (`morph.js`)**: visemes map to keyframes (sil rest, PP MBP, FF MBP+talk, TH/DD/SS/nn talk, kk talk+aa,
+  CH/RR talk+OU, aa, E, I E+talk, O OU+aa, U OU); laugh and smile channels; blink. Upper and lower face have their own
+  weights (the mesh vertex's region mixes them), so a blink does not freeze the mouth. Shape weights are smoothed
+  (35/60 ms); the colour weights are sharpened (power 40 on the eyes, 10 on the mouth), because a half-way
+  cross-fade shows two sets of eyes or faint teeth on closed lips. A per-pass depth test stops folded triangles at the
+  laugh's mouth corners from being added twice (bright streaks in the first try). Clay and crochet use
+  `mode: 'replace'`: the strongest keyframe per region swapped in hard, decided on twos (12 Hz, each face held 2 frames
+  of 24), head motion stepped the same, no morph.
+- New characters (original): `semi_m` Dario (semi-realistic painted illustration, ~40, warm key and cool rim, stubble,
+  crow's feet), `clay_w` Greta (plasticine stop motion), `crochet_m` Bruno (amigurumi). Prompts, seeds, seconds and
+  peaks of every image: `chars/<id>/kf/gen.jsonl`; gate numbers: `kf/raw/gate.json`; which raw became which pose:
+  `kf/index.json` (`src`).
+
+### Numbers (Chrome, M2 Pro, 120 Hz, canvas 1216x1520; voice line + a 1.4 s laugh)
+
+| Character | Engine | fps median / p5 | main-thread ms mean / p95 | load | lag (line without laugh) |
+|---|---|---|---|---|---|
+| film_w | sprites (old) | 120 / 111 | 0.65 / 1.1 | 182 ms | +50 ms |
+| film_w | morph | 120 / 112 | 0.28 / 0.6 | 161 ms | +83 ms |
+| semi_m | morph | 120 / 112 | 0.36 / 0.6 | 124 ms | -67 ms (drawn: -67) |
+| clay_w | replace | 120 / 108 | 0.35 / 0.5 | 109 ms | +117 ms |
+| crochet_m | replace | 120 / 109 | 0.34 / 0.6 | 117 ms | -50 ms |
+
+The morph is cheaper than the sprites (one mesh, 3 to 5 draws of ~900 triangles). It costs ~16 to 33 ms of extra lag
+from its own weight smoothing, and the 12 Hz hold of the replacement faces costs ~50 ms more; both can be paid back
+with the bus's lead offset. Keyframes are 0.5 to 1.2 MB PNG each (7 per character plus the portrait, 5 to 7 MB; webp would cut that several times; not tried).
+
+### Verdict per character, against the four rules (judged on `shots/compare.png`, `shots/kf_poses.png`, harshly)
+
+| Character | 1 whole face moves | 2 teeth | 3 seam | 4 age | Overall |
+|---|---|---|---|---|---|
+| film_w Lia (round 1) | **yes**: real jaw drop (chin 15 % of face width down), cheeks up and eyes into crescents in the laugh, smile cheeks on E | individual upper teeth, lower row partly hidden; gum hint faint | none visible | n/a (twenties, no wrinkles: correct) | **pass**: the laugh is the clearest win over the old puppet |
+| semi_m Dario (3 rounds) | **yes**; laugh with eyes squeezed, brows down, cheeks up | individual upper teeth with ink outlines; lower row shows more than asked | none on the cel shading | **yes**: crow's feet and nasolabial folds at rest, deeper in E and laugh | **pass** after round 2 (round 1: teeth in MBP and OU, a closed grin as laugh) and round 3 (round 1-2 talk pose was a clenched grimace) |
+| clay_w Greta (3 rounds, stop) | yes (replacement faces) | separate clay teeth | none | **fail**: the laugh still has crow's feet and forehead folds; aa sticks the tongue out (rejected, aa falls back to talk) | **fail on rule 4**; round 1-2 also turned clay into human skin, fixed in round 3 with a simpler puppet head |
+| crochet_m Bruno (round 1) | yes (replacement faces); laugh and blink become stitched lines | felt teeth, separate | none | no wrinkles: correct | **pass**, with a stop-motion "boil": the beard's bulk changes between faces |
+
+Best sheets: `chars/film_w/shots/compare.png` (row 1 old sprites, row 2 morph; same timeline, laugh at the end),
+`chars/semi_m/shots/compare.png`, `chars/crochet_m/shots/compare.png`; key poses: `chars/<id>/shots/kf_poses.png`.
+
+### Still failing
+
+- **Transition frames**: the frame where the laugh comes in (rest to laugh at about half weight) still shows a dirty
+  mouth: the laugh's dark mouth squeezed into a half-open shape. One frame at 60 fps, visible on a still.
+- **Rule 4 on clay**: the edit model draws human creases on any laugh; three prompt rounds did not stop it.
+- **Identity drift is small but real**: faces get slightly rounder in the laugh and the beard on crochet changes bulk;
+  the backdrop tone shifts 5 to 15 levels (matched on the face, not used outside it).
+- **Not covered**: game_w (the realistic seam of rule 3) was not regenerated with keyframes; the eyes no longer
+  saccade on replacement faces; no smile when listening (no closed-smile key pose); Safari and phones untested.
+- **Lag numbers** for the male characters use a different voice clip than the female ones (as in pilot 1).
+
 ## What was built
 
 ```
@@ -194,4 +274,14 @@ python3 lab/arena5/puppet/serve.py 8791        # then http://127.0.0.1:8791/pupp
 lab/arena5/puppet/run.sh portraits [id[@seed]]  # Z-Image under watchdog + caffeinate; one heavy job at a time
 backend/.venv/bin/python lab/arena5/puppet/prepare.py   # landmarks + chars/index.json
 # in the page: await __puppet.exportPre('film_w'); then: lab/arena5/puppet/run.sh mouths film_w
+
+# pilot 2: keyframes (FLUX.2 klein 4B q4, mfvenv2), one process, a job queue; one heavy job at a time
+lab/arena5/puppet/kfrun.sh &                                             # caffeinate + watchdog + kf.py serve
+<mflux-py> lab/arena5/puppet/kf.py add portrait semi_m 41 42             # new character (text to image)
+SIZE=640 <mflux-py> lab/arena5/puppet/kf.py add kf semi_m [pose ...] [--tag r2]   # edits of chars/<id>/kf/ref.png
+<mflux-py> lab/arena5/puppet/kf.py quit
+backend/.venv/bin/python lab/arena5/puppet/kfprep.py gate semi_m        # then look at every raw image
+backend/.venv/bin/python lab/arena5/puppet/kfprep.py adopt semi_m [pose=raw_name ...]; ... prepare.py
+# page: ?char=film_w&mouth=morph (clay, crochet: mouth=replace); Laugh button; __puppet.compare({id}) writes
+# chars/<id>/shots/compare.png (old engine vs new, same offline timeline, laugh at the end)
 ```

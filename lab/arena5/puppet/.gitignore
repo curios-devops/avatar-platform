@@ -3,3 +3,4 @@ chars/**/*.png
 chars/*.log
 chars/.status
 vendor/*.task
+chars/.queue/

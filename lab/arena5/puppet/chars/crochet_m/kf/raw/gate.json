@@ -1,0 +1,86 @@
+{
+ "E": {
+  "face": true,
+  "stable_pct": 0.91,
+  "out_abs": 5.16,
+  "tone": 3.7,
+  "chin_down_pct": -1.5,
+  "jawOpen": 0.003,
+  "smile": 0.57,
+  "blink": 0.07,
+  "squint": 0.38,
+  "pass": true
+ },
+ "MBP": {
+  "face": true,
+  "stable_pct": 0.79,
+  "out_abs": 5.12,
+  "tone": 2.4,
+  "chin_down_pct": -1.1,
+  "jawOpen": 0.0,
+  "smile": 0.13,
+  "blink": 0.12,
+  "squint": 0.37,
+  "pass": true
+ },
+ "OU": {
+  "face": true,
+  "stable_pct": 1.41,
+  "out_abs": 5.13,
+  "tone": 3.2,
+  "chin_down_pct": -1.1,
+  "jawOpen": 0.0,
+  "smile": 0.07,
+  "blink": 0.08,
+  "squint": 0.31,
+  "pass": true
+ },
+ "aa": {
+  "face": true,
+  "stable_pct": 2.01,
+  "out_abs": 5.21,
+  "tone": 3.4,
+  "chin_down_pct": 5.9,
+  "jawOpen": 0.079,
+  "smile": 0.32,
+  "blink": 0.04,
+  "squint": 0.24,
+  "pass": true
+ },
+ "blink": {
+  "face": true,
+  "stable_pct": 3.04,
+  "out_abs": 5.17,
+  "tone": 3.7,
+  "chin_down_pct": 0.5,
+  "jawOpen": 0.0,
+  "smile": 0.17,
+  "blink": 0.61,
+  "squint": 0.54,
+  "pass": false
+ },
+ "laugh": {
+  "face": true,
+  "stable_pct": 2.27,
+  "out_abs": 5.24,
+  "tone": 4.6,
+  "chin_down_pct": -0.5,
+  "jawOpen": 0.018,
+  "smile": 0.97,
+  "blink": 0.26,
+  "squint": 0.64,
+  "pass": true
+ },
+ "talk_mid": {
+  "face": true,
+  "stable_pct": 1.45,
+  "out_abs": 5.09,
+  "tone": 3.3,
+  "chin_down_pct": -0.2,
+  "jawOpen": 0.01,
+  "smile": 0.59,
+  "blink": 0.08,
+  "squint": 0.38,
+  "pass": true
+ }
+}
