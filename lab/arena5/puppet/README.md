@@ -114,8 +114,8 @@ Generation 14:47 to 15:06 (19 min wall, ~10 min of compute). The watchdog stoppe
 memory pressure, never heat); other apps held ~4.5 GB in the compressor (a dev server, Chrome, another session's
 tests) and swap reached 4.8 GB, so round 3 was not run and `blink` stayed on round 1.
 
-**Key poses (9)**: rest (the portrait), talk_mid (`talk_soft`), aa, OU (`OU3`: a gentle "you", not a pucker), E (`E2`:
-the wide grin), MBP, laugh (`laugh2`), blink, and a new **smirk**: a closed-mouth confident smile for listening.
+**Key poses (9)**: rest (the portrait), talk_mid (`talk_soft`), aa, OU (`OU4`, round 3), E (`E2`:
+the wide grin), MBP, laugh (`laugh4`, round 3), blink, and a new **smirk**: a closed-mouth confident smile for listening.
 `morph.js` takes `smirk` as an optional 9th key: the listening share of the lower face (and 60 % of the upper face)
 moves to it; `app.js` eases it in over ~0.6 s when he stops talking and out in ~0.1 s when he speaks. Characters
 without it are unchanged (it falls back to rest).
@@ -151,12 +151,21 @@ is a little smoother and more vector-like than the rest pose, visible when it cr
 softly shaded in E and laugh, lower row partly hidden: pass.
 
 **Still failing**
-- **Laugh wrinkles**: both laugh rounds have strong crow's feet and creases on the forehead and nose bridge, more than
-  "light, at 30"; E2 and smirk are within bounds. Same failure as clay: the edit model draws a laugh with creases.
-- **O viseme**: O is OU 0.6 + aa 0.4; Nico's OU is nearly closed, so the blend stretches it open into a pink slot.
-  A per-character viseme map (O to OU only) or a rounder OU key would fix it.
+- ~~Laugh wrinkles~~ and ~~O viseme~~: fixed in round 3 below.
 - **Transition frames**: the grey half-teeth when the mouth passes between keys (pilot 2's open issue) shows on E.
 - Generated at 512x640 and upscaled to 640x800: soft on a large screen; needs a quieter Mac (or a GPU) for 768+.
+
+**Round 3 (15:09-15:11, 4 edits, 25 s each, no watchdog stop).** Two fixes, two seeds each (76, 77), kept only where
+better:
+- **O**: rounds 1-2 gave duck lips (OU2) or a nearly closed mouth (OU3), and the runtime O (OU 0.6 + aa 0.4) stretched
+  that open into a pink slot with a tooth gap. New `OU4` (rounded lips slightly forward, a small dark round opening,
+  no teeth), seed 76 adopted; and `kf/index.json` can now carry a per-character viseme map (`vis`), read by
+  `morph.js`: Nico's O is his OU key alone, no aa. Other characters keep the default map.
+- **Laugh**: `laugh4` keeps the open laugh with individual upper teeth but asks for eyes smiling yet open, brows level,
+  two or three fine crow's feet, smooth forehead and nose bridge. Seed 76 adopted: much lighter crow's feet, no
+  forehead lines, no nose crease (seed 77 drifted, out 8.5). Still a little more crow's feet than E.
+- Sheet regenerated (`chars/nico/shots/sheet_nico.png`); the transition frame on E no longer shows grey teeth in this
+  timeline, but the issue is not fixed in general.
 
 ## What was built
 
@@ -351,6 +360,6 @@ backend/.venv/bin/python lab/arena5/puppet/kfprep.py gate semi_m        # then l
 backend/.venv/bin/python lab/arena5/puppet/kfprep.py adopt semi_m [pose=raw_name ...]; ... prepare.py
 # page: ?char=film_w&mouth=morph (clay, crochet: mouth=replace); Laugh button; __puppet.compare({id}) writes
 # chars/<id>/shots/compare.png (old engine vs new, same offline timeline, laugh at the end)
-# nico: SIZE=640x800 ... add portrait nico 76; SIZE=512x640 ... add kf nico talk_soft aa OU3 E2 MBP2 laugh2 blink smirk
+# nico: SIZE=640x800 ... add portrait nico 76; SIZE=512x640 ... add kf nico talk_soft aa OU4 E2 MBP2 laugh4 blink smirk
 # (MLX_CACHE_MB=0 for kf.py serve); python3 lab/arena5/puppet/nico_voice.py; page ?char=nico, __puppet.poseSheet()
 ```

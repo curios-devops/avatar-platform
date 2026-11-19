@@ -128,6 +128,14 @@ POSES = {
     # nico: the 9th key pose (listening) and a grin for E
     "OU3": "the lips gently rounded into a small 'oo' shape as in the word 'you', a small dark round opening, the lips "
            "only slightly forward, not puckered, not pouting, no teeth visible, no smile, the jaw slightly lowered.",
+    # round 3 (nico, coordinator): OU3 was nearly closed, so the O blend opened it into a pink slot; the laugh had
+    # crow's feet fanning wide and creases on the forehead and nose bridge
+    "OU4": "the lips rounded and pushed slightly forward into a round 'oh' shape, a small dark round opening in the "
+           "centre of the lips, about as wide as a coin, no teeth visible, no tongue, the jaw slightly lowered, no smile.",
+    "laugh4": "a big open-mouthed laugh: the jaw dropped and the mouth open wide, the whole upper row of individual "
+              "teeth visible with natural separation and soft shading, the lower row partly hidden by the lower lip, the "
+              "dark mouth and the tongue below, the cheeks lifted, the eyes smiling and a little narrowed but still open, "
+              "the eyebrows relaxed and level.",
     "smirk": "a confident closed-mouth smirk while listening: the lips stay closed with no teeth showing, one mouth "
              "corner pulled up a little higher than the other, the cheeks lifted a little, the eyes slightly narrowed "
              "with amusement, the eyebrows relaxed, a charming, slightly mischievous look.",
@@ -149,6 +157,10 @@ AGE_NICO = {"E2": " Only light crow's feet at the outer eye corners and soft lau
                    "grin, as on a man of thirty; the forehead and the rest of the face stay smooth.",
             "laugh2": " Only a few light crow's feet at the outer eye corners and soft laugh lines beside the mouth, as on "
                       "a man of thirty; no lines on the forehead, no creases between the eyebrows or on the nose.",
+            "laugh4": " He is thirty: only two or three fine light crow's feet at the outer eye corners and soft laugh "
+                      "lines beside the mouth; the forehead is smooth with no lines, the skin between the eyebrows and on "
+                      "the nose bridge is smooth with no creases.",
+            "OU4": " No wrinkles.",
             "smirk": " A faint laugh line at the raised mouth corner and a hint of crow's feet, as on a man of thirty; the "
                      "forehead stays smooth."}
 # round 2 (nico): round 1's "smooth skin" line shaved off his stubble and airbrushed the face in talk, OU and MBP;
@@ -199,9 +211,9 @@ def kf_prompt(cid: str, pose: str) -> str:
         p += AGE.get(pose, "")
     elif style in ("clay", "crochet"):
         p += SMOOTH + MATERIAL[style]
-    if mouth and pose not in ("blink", "MBP", "MBP2", "OU2", "talk_soft", "smirk", "OU3"):  # round 1 put teeth into MBP and OU through this line
+    if mouth and pose not in ("blink", "MBP", "MBP2", "OU2", "talk_soft", "smirk", "OU3", "OU4"):  # round 1 put teeth into MBP and OU through this line
         p += f" The mouth is {mouth}."
-    elif mouth and pose in ("MBP2", "OU2", "smirk", "OU3"):
+    elif mouth and pose in ("MBP2", "OU2", "smirk", "OU3", "OU4"):
         p += f" The lips are {LIPS[style]}, with no teeth showing."
     return p
 

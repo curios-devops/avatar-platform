@@ -105,6 +105,7 @@ export class Morph {
   constructor(canvas, idx, keys, imgs, tess, mode) {
     this.canvas = canvas; this.mode = mode; this.mouth = mode; this.sprites = [];
     this.W = idx.w; this.H = idx.h; this.keys = keys;
+    this.vis = { ...VIS, ...(idx.vis || {}) };  // per-character viseme map override (kf/index.json `vis`; nico: O = OU only)
     const gl = this.gl = canvas.getContext('webgl2', { antialias: true, premultipliedAlpha: true, preserveDrawingBuffer: true });
     if (!gl) throw new Error('WebGL2 not available');
     const NL = 478, NF = NL + 1, NO = OVAL.length, V = this.V = NF + RINGS.length * NO;
@@ -228,7 +229,7 @@ export class Morph {
     };
     const vis = {};
     let sum = 0;
-    for (const [id, w] of Object.entries(st.vis || { sil: 1 })) { if (!(w > 0)) continue; sum += w; for (const [k, f] of Object.entries(VIS[id] || VIS.sil)) add(vis, k, w * f); }
+    for (const [id, w] of Object.entries(st.vis || { sil: 1 })) { if (!(w > 0)) continue; sum += w; for (const [k, f] of Object.entries(this.vis[id] || VIS.sil)) add(vis, k, w * f); }
     if (sum < 1) add(vis, 'rest', 1 - sum);
     const s = Math.min(1, st.expressSmile || 0), l = Math.min(1, st.laugh || 0), p = st.laughPulse ?? 1;
     const b = Math.max(st.blink?.[0] || 0, st.blink?.[1] || 0);
